@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-blue: #0A2463;
+  --color-brand-light: #3E92CC;
+  --font-sans: 'Inter', sans-serif;
+}
+
+:root {
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark {
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border-color: #334155;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* Global utility classes for theme colors */
+.theme-card {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+
+/* Base transitions for all elements to ensure smooth theme switching */
+* {
+  @apply transition-colors duration-300;
+}
+
+/* Global dark mode overrides for common components to avoid editing every file */
+.dark .bg-white {
+  background-color: var(--bg-card) !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-100 {
+  background-color: #1a2234 !important;
+}
+
+.dark .border-slate-200,
+.dark .border-slate-100,
+.dark .border-slate-300,
+.dark .border-slate-50,
+.dark .border-slate-700 {
+  border-color: var(--border-color) !important;
+}
+
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-700 {
+  color: var(--text-primary) !important;
+}
+
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: var(--text-secondary) !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1a2234 !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.dark .divide-slate-100,
+.dark .divide-slate-200,
+.dark .divide-slate-50,
+.dark .divide-slate-700 {
+  border-color: var(--border-color) !important;
+}
+
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-50\/50:hover,
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-slate-700:hover {
+  background-color: #334155 !important;
+}
+
+.dark thead.bg-slate-50,
+.dark thead.bg-slate-100,
+.dark thead.bg-slate-900 {
+  background-color: #0f172a !important;
+}

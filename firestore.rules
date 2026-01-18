@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /products/{productId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    
+    match /invoices/{invoiceId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      // Only admin can delete invoices
+      allow delete: if isAdmin();
+    }
+    
+    match /inventoryLogs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      // Logs shouldn't be deleted or updated usually, but easy for admin
+      allow update, delete: if isAdmin();
+    }
+    
+    match /customers/{customerId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
