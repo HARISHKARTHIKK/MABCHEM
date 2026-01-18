@@ -39,7 +39,7 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
         docDate: docDate,
 
         // Dispatcher Details (from Settings)
-        fromGstin: company.gstin || import.meta.env.VITE_COMPANY_GSTIN || "",
+        fromGstin: company.gstin || import.meta.env.VITE_COMPANY_GSTIN || "DUMMY_GSTIN",
         fromTrdName: (company.name || "MAB CHEM").substring(0, 100),
         fromAddr1: (company.address || "OFFICE ADDRESS").substring(0, 100),
         fromAddr2: "",
@@ -48,17 +48,17 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
         fromStateCode: 33, // Default state code (Tamil Nadu)
 
         // Recipient Details (from Invoice/Customer)
-        toGstin: customerGSTIN || "",
+        toGstin: customerGSTIN || "DUMMY_GSTIN",
         toTrdName: (customerName || "CUSTOMER").substring(0, 100),
         toAddr1: (invoiceData.customerAddress || "CUSTOMER ADDRESS").substring(0, 100),
         toAddr2: "",
         toPlace: "DESTINATION",
-        toPincode: Number(destinationPincode) || 0,
+        toPincode: Number(destinationPincode) || 600001,
         toStateCode: 33,
 
         transactionType: 1, // Regular
         dispatchFromPincode: Number(company.pincode) || Number(company.pinCode) || 600001,
-        shipToPincode: Number(destinationPincode) || 0,
+        shipToPincode: Number(destinationPincode) || 600001,
 
         // Items mapping - Strictly ensuring all IDs/HSNs are numeric for NIC
         itemList: (itemsSummary || []).map((item, index) => {

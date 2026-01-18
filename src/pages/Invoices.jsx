@@ -266,14 +266,14 @@ export default function Invoices() {
                                                                 <Download className="h-4 w-4 fill-amber-500 text-amber-500" />
                                                             </button>
                                                             <a
-                                                                href="https://services.gst.gov.in/services/login?flag=einvoice"
+                                                                href="https://einvoice1.gst.gov.in/"
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                title="GST E-Invoice Login"
+                                                                title="Go to E-Invoice Portal"
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 className="flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-blue-50 text-blue-700 hover:bg-blue-100 hover:shadow-blue-200 hover:scale-105 active:scale-95 no-underline border border-blue-100"
                                                             >
-                                                                <LogIn className="h-4 w-4" />
+                                                                <ExternalLink className="h-4 w-4" />
                                                             </a>
                                                         </div>
                                                     )}
