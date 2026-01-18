@@ -1,9 +1,7 @@
 /**
  * Utility to generate NIC E-Way Bill Bulk Upload JSON
- * Mandatory fields as per request: 
- * supplyType, subSupplyType, docType, docNo, docDate, fromGstin, fromPincode, 
- * toGstin, toPincode, hsnCode, taxableAmount, cgstValue, sgstValue, igstValue, 
- * transDistance, vehicleNo
+ * This function replicates the logic previously handled by the Node.js backend
+ * to support a pure Static Site deployment.
  */
 
 export const generateEwayBillJSON = (invoiceData, settings) => {
@@ -21,39 +19,56 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
         itemsSummary,
         customerGSTIN,
         customerName,
-        taxRate
+        taxRate,
+        fromLocation
     } = invoiceData;
 
     const company = settings?.company || {};
 
-    // Format date as DD/MM/YYYY
+    // Format date as DD/MM/YYYY for NIC Bulk Upload format
     const docDate = createdAt?.seconds ?
         new Date(createdAt.seconds * 1000).toLocaleDateString('en-GB') :
         new Date().toLocaleDateString('en-GB');
 
-    // NIC Bulk Upload expect numbers as numbers (no quotes)
+    // NIC Bulk Upload expect numeric values as numbers (no quotes)
     const payload = {
         supplyType: "O", // Outward
         subSupplyType: "1", // Supply
         docType: "INV", // Tax Invoice
         docNo: invoiceNo,
         docDate: docDate,
+
+        // Dispatcher Details (from Settings)
         fromGstin: company.gstin || import.meta.env.VITE_COMPANY_GSTIN || "",
+        fromTrdName: (company.name || "MAB CHEM").substring(0, 100),
+        fromAddr1: (company.address || "OFFICE ADDRESS").substring(0, 100),
+        fromAddr2: "",
+        fromPlace: fromLocation || "WAREHOUSE",
         fromPincode: Number(company.pincode) || Number(company.pinCode) || 600001,
+        fromStateCode: 33, // Default state code (Tamil Nadu)
+
+        // Recipient Details (from Invoice/Customer)
         toGstin: customerGSTIN || "",
+        toTrdName: (customerName || "CUSTOMER").substring(0, 100),
+        toAddr1: (invoiceData.customerAddress || "CUSTOMER ADDRESS").substring(0, 100),
+        toAddr2: "",
+        toPlace: "DESTINATION",
         toPincode: Number(destinationPincode) || 0,
+        toStateCode: 33,
+
         transactionType: 1, // Regular
         dispatchFromPincode: Number(company.pincode) || Number(company.pinCode) || 600001,
         shipToPincode: Number(destinationPincode) || 0,
 
-        // Items mapping
-        itemList: (itemsSummary || []).map(item => {
+        // Items mapping - Strictly ensuring all IDs/HSNs are numeric for NIC
+        itemList: (itemsSummary || []).map((item, index) => {
             const itemTaxable = Number(item.quantity) * Number(item.price);
             const rate = Number(taxRate) || 18;
             return {
+                itemNo: index + 1,
                 productName: item.productName || item.name,
                 productDesc: item.productName || item.name,
-                hsnCode: Number(item.hsnCode) || 0,
+                hsnCode: Number(item.hsnCode) || 3824, // Fallback to common HSN if missing
                 quantity: Number(item.quantity),
                 qtyUnit: "MTS",
                 cgstRate: Number((rate / 2).toFixed(2)),
@@ -64,6 +79,7 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
             };
         }),
 
+        // Summary Values
         totalValue: Number(Number(taxableValue || 0).toFixed(2)),
         cgstValue: Number((Number(taxAmount || 0) / 2).toFixed(2)),
         sgstValue: Number((Number(taxAmount || 0) / 2).toFixed(2)),
@@ -71,11 +87,13 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
         cessValue: 0,
         totInvValue: Number(Number(totalAmount || 0).toFixed(2)),
 
-        // Transportation
+        // Transportation Details
         transMode: "1", // Road
         transDistance: Number(distance) || 0,
         transporterId: transporterGSTIN || "",
         transporterName: transporterName || "",
+        transDocNo: "",
+        transDocDate: "",
         vehicleNo: (vehicleNumber || "").replace(/\s+/g, "").toUpperCase(),
         vehicleType: "R" // Regular
     };
@@ -83,6 +101,9 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
     return payload;
 };
 
+/**
+ * Helper to trigger a browser download of the generated JSON
+ */
 export const downloadJSON = (filename, data) => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

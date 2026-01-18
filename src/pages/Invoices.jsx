@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { exportToCSV } from '../utils/exportToCSV';
 import { generateEwayBillJSON, downloadJSON } from '../utils/ewaybillExport';
-import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download } from 'lucide-react';
-import axios from 'axios';
+import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
 import { createInvoice } from '../services/firestoreService';
@@ -267,14 +266,14 @@ export default function Invoices() {
                                                                 <Download className="h-4 w-4 fill-amber-500 text-amber-500" />
                                                             </button>
                                                             <a
-                                                                href="https://ewaybillgst.gov.in/"
+                                                                href="https://services.gst.gov.in/services/login?flag=einvoice"
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                title="Go to E-Way Portal"
+                                                                title="GST E-Invoice Login"
                                                                 onClick={(e) => e.stopPropagation()}
-                                                                className="flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-blue-50 text-blue-600 hover:bg-blue-100 hover:shadow-blue-100/50 hover:scale-105 active:scale-95 no-underline"
+                                                                className="flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-blue-50 text-blue-700 hover:bg-blue-100 hover:shadow-blue-200 hover:scale-105 active:scale-95 no-underline border border-blue-100"
                                                             >
-                                                                <ExternalLink className="h-4 w-4" />
+                                                                <LogIn className="h-4 w-4" />
                                                             </a>
                                                         </div>
                                                     )}
