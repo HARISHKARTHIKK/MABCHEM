@@ -102,7 +102,30 @@ export default function Dashboard() {
     }, []);
 
     const sortedProducts = useMemo(() => {
-        return [...products].sort((a, b) => (Number(a.sortOrder) || 999) - (Number(b.sortOrder) || 999));
+        const ORDER = [
+            'METACHEM',
+            'GREEN STPP',
+            'NA (LIGNO)',
+            'NAHS-C',
+            'SYASSKY'
+        ];
+
+        return [...products].sort((a, b) => {
+            const nameA = a.name?.toUpperCase() || '';
+            const nameB = b.name?.toUpperCase() || '';
+
+            const indexA = ORDER.findIndex(item => nameA.includes(item));
+            const indexB = ORDER.findIndex(item => nameB.includes(item));
+
+            // If both are in our forced order list, sort by that order
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            // If only one is in the list, the list item comes first
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+
+            // Otherwise fallback to original sortOrder
+            return (Number(a.sortOrder) || 999) - (Number(b.sortOrder) || 999);
+        });
     }, [products]);
 
     const monthlySummary = useMemo(() => {
@@ -231,7 +254,7 @@ export default function Dashboard() {
                         View All <ArrowRight className="h-3 w-3" />
                     </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
                     {sortedProducts.map(p => {
                         const totalStock = Object.values(p.locations || {}).reduce((a, b) => {
                             const val = Number(b);
@@ -241,34 +264,33 @@ export default function Dashboard() {
                         const hasLocations = p.locations && Object.keys(p.locations).length > 0;
 
                         return (
-                            <div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-4 flex flex-col justify-between hover:shadow-md dark:hover:shadow-slate-900/50 transition-shadow relative overflow-hidden group">
+                            <div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-3 flex flex-col justify-between hover:shadow-md dark:hover:shadow-slate-900/50 transition-shadow relative overflow-hidden group">
                                 <div>
                                     <div className="flex justify-between items-start mb-2">
-                                        <h4 className="font-bold text-slate-800 dark:text-slate-100 truncate pr-4 text-base" title={p.name}>{p.name}</h4>
+                                        <h4 className="font-bold text-slate-800 dark:text-slate-100 truncate pr-4 text-xs" title={p.name}>{p.name}</h4>
                                         {isLow && <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />}
                                     </div>
 
                                     {/* Dashboard: Location Specific Prominent Stock info */}
-                                    <div className="mb-2 space-y-1.5">
+                                    <div className="mb-2 space-y-1">
                                         {hasLocations && Object.entries(p.locations).map(([loc, qty]) => (
-                                            <div key={loc} className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 px-2 py-1.5 rounded-lg">
-                                                <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">{loc}</span>
+                                            <div key={loc} className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 px-2 py-1 rounded-lg">
+                                                <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">{loc}</span>
                                                 <div className="text-right">
-                                                    <span className="text-xl font-black text-slate-800 dark:text-slate-100 leading-none">{(Number(qty) || 0).toFixed(1)}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 ml-1 uppercase">mts</span>
+                                                    <span className="text-lg font-black text-slate-800 dark:text-slate-100 leading-none">{(Number(qty) || 0).toFixed(1)}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 ml-1 uppercase">mts</span>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="border-t border-slate-50 dark:border-slate-700/50 mb-2" />
-                                    <div className="mb-3">
+                                    <div className="border-t border-slate-50 dark:border-slate-700/50 mb-1" />
+                                    <div className="mb-1">
                                         <div className="flex items-baseline gap-1">
-                                            <span className={`text-xs font-bold ${isLow ? 'text-amber-600' : 'text-slate-500'}`}>{totalStock.toFixed(1)}</span>
-                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">TOTAL STOCK (mts)</span>
+                                            <span className={`text-[10px] font-bold ${isLow ? 'text-amber-600' : 'text-slate-500'}`}>{totalStock.toFixed(1)}</span>
+                                            <span className="text-[8px] text-slate-400 font-medium uppercase tracking-tighter">TOTAL STOCK (mts)</span>
                                         </div>
                                     </div>
                                 </div>
-
                             </div>
                         );
                     })}
