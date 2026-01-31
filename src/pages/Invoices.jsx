@@ -663,7 +663,7 @@ function CreateInvoice({ onCancel, onSuccess }) {
                         <label className="block text-[9px] font-black text-slate-400 uppercase mb-0.5">Invoice Number</label>
                         <input
                             type="text"
-                            className="bg-slate-50 border-none rounded-lg px-3 py-1.5 text-right font-mono font-bold text-base text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none w-28"
+                            className="bg-slate-50 border-none rounded-lg px-3 py-1.5 text-right font-mono font-bold text-base text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none w-48"
                             value={invoiceNo}
                             onChange={(e) => setInvoiceNo(e.target.value)}
                         />
