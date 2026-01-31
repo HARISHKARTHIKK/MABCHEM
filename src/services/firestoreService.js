@@ -167,6 +167,31 @@ export const updateIncome = (id, data) => updateDoc(doc(db, 'income', id), {
 export const deleteIncome = (id) => deleteDoc(doc(db, 'income', id));
 
 /* =========================
+   PURCHASE ORDERS (NEW)
+========================= */
+
+export const addPurchaseOrder = async (data) => {
+    const auth = getAuth();
+    if (!auth.currentUser) throw new Error("User not authenticated");
+
+    return await addDoc(collection(db, "purchaseOrders"), {
+        ...data,
+        userId: auth.currentUser.uid,
+        status: 'Open',
+        createdAt: serverTimestamp()
+    });
+};
+
+export const updatePurchaseOrder = async (id, data) => {
+    await updateDoc(doc(db, "purchaseOrders", id), {
+        ...data,
+        updatedAt: serverTimestamp()
+    });
+};
+
+export const deletePurchaseOrder = (id) => deleteDoc(doc(db, 'purchaseOrders', id));
+
+/* =========================
    INVOICES
 ========================= */
 
@@ -186,24 +211,29 @@ export const createInvoice = async (invoice, items, fromLocation) => {
     }
 
     return await runTransaction(db, async (transaction) => {
-        // 1. Read all products first
+        // 1. PO Handling - If multiple items are linked to different POs or same PO
+        const poIds = [...new Set(items.filter(item => item.purchaseOrderId).map(item => item.purchaseOrderId))];
+        const poSnaps = await Promise.all(poIds.map(id => transaction.get(doc(db, "purchaseOrders", id))));
+        const poMap = {};
+        poSnaps.forEach(snap => { if (snap.exists()) poMap[snap.id] = snap.data(); });
+
+        // 2. Read all products
         const productRefs = items.map(item => doc(db, "products", item.productId));
         const productSnaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
-        // 2. Validate Stock & Prepare Updates
+        // 3. Validate Stock, PO & Prepare Updates
         const productUpdates = [];
         const itemsSummary = [];
+        const poUpdates = {};
 
         items.forEach((item, index) => {
             const snap = productSnaps[index];
             if (!snap.exists()) throw new Error(`Product not found: ${item.name}`);
 
             const rawQty = item.quantity !== undefined ? item.quantity : item.qty;
-            // Prevent String Injection: Strip non-numeric characters (like 'mts' or spaces)
             const sanitizedQty = String(rawQty).replace(/[^0-9.]/g, '');
             let quantity = Number(sanitizedQty);
 
-            // Backend Safety: Force convert to number if type check fails or NaN occurs
             if (typeof quantity !== 'number' || isNaN(quantity)) {
                 quantity = Number(sanitizedQty) || 0;
             }
@@ -213,8 +243,41 @@ export const createInvoice = async (invoice, items, fromLocation) => {
             }
             if (quantity < 0) throw new Error(`Quantity cannot be negative for product: ${item.name}`);
 
+            // PO Validation & Update Preparation
+            if (item.purchaseOrderId) {
+                const poData = poMap[item.purchaseOrderId];
+                if (!poData) throw new Error(`Purchase Order not found for item ${item.name}`);
+
+                const poItemIndex = poData.items.findIndex(i => i.productId === item.productId);
+                if (poItemIndex === -1) throw new Error(`Product ${item.name} not found in PO ${poData.poNumber}`);
+
+                const poItem = poData.items[poItemIndex];
+                const remaining = Number(poItem.remainingQty || 0);
+
+                if (quantity > remaining + 0.001) { // Adding small epsilon for floating point
+                    throw new Error(`Quantity ${quantity} exceeds PO remaining balance of ${remaining} for ${item.name}`);
+                }
+
+                const newDelivered = Number((Number(poItem.deliveredQty || 0) + quantity).toFixed(2));
+                const newRemaining = Number((Number(poItem.totalQty) - newDelivered).toFixed(2));
+
+                if (!poUpdates[item.purchaseOrderId]) {
+                    poUpdates[item.purchaseOrderId] = JSON.parse(JSON.stringify(poData.items));
+                }
+                poUpdates[item.purchaseOrderId][poItemIndex].deliveredQty = newDelivered;
+                poUpdates[item.purchaseOrderId][poItemIndex].remainingQty = newRemaining;
+
+                if (!poUpdates[item.purchaseOrderId][poItemIndex].fulfillments) {
+                    poUpdates[item.purchaseOrderId][poItemIndex].fulfillments = [];
+                }
+                poUpdates[item.purchaseOrderId][poItemIndex].fulfillments.push({
+                    invoiceNo: invoice.invoiceNo,
+                    quantity: quantity,
+                    date: invoice.date || new Date().toISOString().split('T')[0]
+                });
+            }
+
             const data = snap.data();
-            const globalStock = Number(data.stockQty) || 0;
             const locations = data.locations || {};
             const currentLocStock = Number(locations[fromLocation]) || 0;
 
@@ -225,10 +288,7 @@ export const createInvoice = async (invoice, items, fromLocation) => {
             }
 
             const newLocStock = Number((currentLocStock - quantity).toFixed(1));
-
-            // Derive new locations map
             const newLocations = { ...locations, [fromLocation]: newLocStock };
-            // Calculate new Total Logic directly from locations
             const newTotalStock = Object.values(newLocations).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
 
             productUpdates.push({
@@ -247,19 +307,31 @@ export const createInvoice = async (invoice, items, fromLocation) => {
                 price: Number(item.price) || 0,
                 bags: Number(item.bags) || 0,
                 bagWeight: Number(item.bagWeight) || 0,
-                hsnCode: item.hsnCode || ''
+                hsnCode: item.hsnCode || '',
+                purchaseOrderId: item.purchaseOrderId || null
             });
         });
 
-        // 3. Write Invoice with itemsSummary
+        // 4. Apply PO Updates
+        Object.keys(poUpdates).forEach(poId => {
+            const updatedItems = poUpdates[poId];
+            const isFullyFulfilled = updatedItems.every(i => Number(i.remainingQty) <= 0);
+            transaction.update(doc(db, "purchaseOrders", poId), {
+                items: updatedItems,
+                status: isFullyFulfilled ? 'Completed' : 'Partially Fulfilled',
+                updatedAt: serverTimestamp()
+            });
+        });
+
+        // 5. Write Invoice
         const invoiceRef = doc(collection(db, "invoices"));
-        const taxRate = Number(invoice.taxRate) || 18; // Passed from UI or default
+        const taxRate = Number(invoice.taxRate) || 18;
 
         transaction.set(invoiceRef, {
             ...invoice,
             fromLocation,
             taxRate,
-            itemsSummary, // Added for Report Efficiency
+            itemsSummary,
             userId: uid,
             createdAt: serverTimestamp()
         });

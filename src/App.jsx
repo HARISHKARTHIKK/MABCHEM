@@ -16,6 +16,7 @@ import TransporterReports from './pages/TransporterReports';
 import Expenses from './pages/Expenses';
 import StockManagement from './pages/StockManagement';
 import Suppliers from './pages/Suppliers';
+import PurchaseOrders from './pages/PurchaseOrders';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -126,6 +127,7 @@ export default function App() {
               <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+              <Route path="/purchase-orders" element={<ProtectedRoute><PurchaseOrders /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/dispatch" element={<ProtectedRoute><Dispatch /></ProtectedRoute>} />
               <Route path="/transporters" element={<ProtectedRoute><Transporters /></ProtectedRoute>} />

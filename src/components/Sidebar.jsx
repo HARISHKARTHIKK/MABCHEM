@@ -13,6 +13,7 @@ const navigation = [
     { name: 'Stock Management', href: '/stock-management', icon: Box },
     { name: 'Dispatch', href: '/dispatch', icon: Truck },
     { name: 'Customers', href: '/customers', icon: Users },
+    { name: 'Purchase Orders', href: '/purchase-orders', icon: ClipboardList },
     { name: 'Transporters', href: '/transporters', icon: Truck },
     { name: 'Suppliers', href: '/suppliers', icon: Users },
     { name: 'Logistics Reports', href: '/transporter-reports', icon: TrendingUp },

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { exportToCSV } from '../utils/exportToCSV';
 import { generateEwayBillJSON, downloadJSON } from '../utils/ewaybillExport';
-import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn } from 'lucide-react';
+import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn, Clock } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
 import { createInvoice } from '../services/firestoreService';
@@ -383,10 +383,11 @@ function CreateInvoice({ onCancel, onSuccess }) {
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState('');
-    const [fromLocation, setFromLocation] = useState(userData?.location || 'CHENNAI');
+    const [fromLocation, setFromLocation] = useState('CHENNAI');
     const [invoiceNo, setInvoiceNo] = useState('');
     const [lines, setLines] = useState([{ productId: '', qty: '0', price: '0', stock: 0, bags: '', bagWeight: '' }]);
     const [remarks, setRemarks] = useState('');
+    const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [submitting, setSubmitting] = useState(false);
 
     // New Logistics State
@@ -417,14 +418,9 @@ function CreateInvoice({ onCancel, onSuccess }) {
         }
     };
 
-    const baseLocations = settings?.locations?.filter(l => l.active).map(l => l.name) || ['Warehouse A', 'Warehouse B', 'Store Front', 'Factory'];
+    const baseLocations = settings?.locations?.filter(l => l.active).map(l => l.name) || ['CHENNAI', 'Warehouse A', 'Warehouse B', 'Store Front', 'Factory'];
     const LOCATIONS = [...new Set([...baseLocations, userData?.location].filter(Boolean))];
 
-    useEffect(() => {
-        if (!fromLocation && userData?.location) {
-            setFromLocation(userData.location);
-        }
-    }, [userData]);
 
     useEffect(() => {
         if (fromLocation && settings?.locations) {
@@ -464,10 +460,16 @@ function CreateInvoice({ onCancel, onSuccess }) {
             setTransporters(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
         });
 
+        const qPOs = query(collection(db, 'purchaseOrders'), where('status', 'in', ['Open', 'Partially Fulfilled']));
+        const unsubPOs = onSnapshot(qPOs, (snapshot) => {
+            setPurchaseOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
         return () => {
             unsubCustomers();
             unsubProducts();
             unsubTransporters();
+            unsubPOs();
         };
     }, []);
 
@@ -477,7 +479,7 @@ function CreateInvoice({ onCancel, onSuccess }) {
     };
 
     const addLine = () => {
-        setLines([...lines, { productId: '', qty: '0', price: '0', stock: 0, bags: '', bagWeight: '' }]);
+        setLines([...lines, { productId: '', qty: '0', price: '0', stock: 0, bags: '', bagWeight: '', purchaseOrderId: '' }]);
     };
 
     const updateLine = (index, field, value) => {
@@ -504,8 +506,20 @@ function CreateInvoice({ onCancel, onSuccess }) {
             updatedLine.stock = Number(getStockAtLocation(prod));
             updatedLine.bags = '';
             updatedLine.bagWeight = '';
+            updatedLine.purchaseOrderId = '';
         } else {
             updatedLine[field] = processedValue;
+        }
+
+        // Auto-fill price from PO Rate if linking to a PO
+        if (field === 'purchaseOrderId' && value) {
+            const po = purchaseOrders.find(p => p.id === value);
+            if (po) {
+                const poItem = po.items.find(i => i.productId === updatedLine.productId);
+                if (poItem && poItem.rate) {
+                    updatedLine.price = String(poItem.rate);
+                }
+            }
         }
 
         if (field === 'bags' || field === 'bagWeight') {
@@ -708,6 +722,28 @@ function CreateInvoice({ onCancel, onSuccess }) {
                 </div>
             </div>
 
+            {selectedCustomer && purchaseOrders.filter(po => po.customerId === selectedCustomer).length > 0 && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-indigo-700 font-black text-[10px] uppercase tracking-wider">
+                        <Clock className="h-3 w-3" /> Active Purchase Orders for this Customer
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {purchaseOrders.filter(po => po.customerId === selectedCustomer).map(po => (
+                            <div key={po.id} className="bg-white border border-indigo-200 px-3 py-1.5 rounded-xl flex items-center gap-3 shadow-sm">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">PO# {po.poNumber}</div>
+                                <div className="flex gap-2">
+                                    {po.items.map((item, i) => (
+                                        <div key={i} className="text-[10px] font-bold text-slate-700">
+                                            {item.productName}: <span className="text-indigo-600">{item.remainingQty} MTS</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="h-6 w-1 bg-blue-600 rounded-full"></div>
@@ -816,6 +852,7 @@ function CreateInvoice({ onCancel, onSuccess }) {
                                         <th className="px-2 py-3 text-center w-24">Bags</th>
                                         <th className="px-2 py-3 text-center w-24">Wt (kg)</th>
                                         <th className="px-2 py-3 text-center w-32" title="Quantity in MTS">Quantity</th>
+                                        <th className="px-2 py-3 text-center w-48 text-indigo-600">Link to PO</th>
                                         <th className="px-2 py-3 text-center w-32">Rate (₹)</th>
                                         <th className="px-4 py-3 text-right w-36">Line Total</th>
                                         <th className="px-4 py-3 w-16"></th>
@@ -871,6 +908,38 @@ function CreateInvoice({ onCancel, onSuccess }) {
                                                     />
                                                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400">MTS</span>
                                                 </div>
+                                            </td>
+                                            <td className="px-2 py-2.5">
+                                                <select
+                                                    className={`w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none ${line.purchaseOrderId ? 'text-blue-600 bg-blue-50/50' : ''}`}
+                                                    value={line.purchaseOrderId}
+                                                    onChange={(e) => updateLine(idx, 'purchaseOrderId', e.target.value)}
+                                                    disabled={!selectedCustomer || !line.productId}
+                                                >
+                                                    <option value="">No PO Link</option>
+                                                    {purchaseOrders
+                                                        .filter(po => po.customerId === selectedCustomer)
+                                                        .flatMap(po =>
+                                                            po.items
+                                                                .filter(item => item.productId === line.productId && item.remainingQty > 0)
+                                                                .map(item => ({
+                                                                    id: po.id,
+                                                                    poNumber: po.poNumber,
+                                                                    remaining: item.remainingQty
+                                                                }))
+                                                        )
+                                                        .map(poItem => (
+                                                            <option key={`${poItem.id}-${line.productId}`} value={poItem.id}>
+                                                                {poItem.poNumber} (Bal: {poItem.remaining} MTS)
+                                                            </option>
+                                                        ))
+                                                    }
+                                                </select>
+                                                {line.purchaseOrderId && (
+                                                    <div className="text-[8px] font-black text-blue-500 uppercase tracking-tighter text-center mt-1">
+                                                        Linked to PO
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-2 py-2.5">
                                                 <input
