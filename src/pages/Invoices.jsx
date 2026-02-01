@@ -583,7 +583,8 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
         const totalTax = linesTotal * (taxRate / 100);
 
         // GST Splitting Logic
-        const companyGST = settings?.company?.gstin || '';
+        const selectedLocationObj = settings?.locations?.find(l => l.name === fromLocation);
+        const companyGST = selectedLocationObj?.gstin || settings?.company?.gstin || '';
         const selectedCustomerObj = customers.find(c => c.id === selectedCustomer);
         const customerGST = selectedCustomerObj?.gstin || '';
 
@@ -621,7 +622,8 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
             cgst,
             sgst,
             igst,
-            isIntrastate
+            isIntrastate,
+            companyGST
         };
     };
 
@@ -658,7 +660,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
 
         setSubmitting(true);
         try {
-            const { linesTotal, tax, total, taxableValue, cgst, sgst, igst, isIntrastate } = calculateTotals();
+            const { linesTotal, tax, total, taxableValue, cgst, sgst, igst, isIntrastate, companyGST } = calculateTotals();
             const customerObj = customers.find(c => c.id === selectedCustomer);
 
             const preparedItems = validLines.map(l => {
@@ -678,6 +680,8 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                 customerId: selectedCustomer,
                 customerName: customerObj?.name || 'Unknown',
                 customerGSTIN: customerObj?.gstin || '',
+                sellerGSTIN: companyGST,
+                fromLocation: fromLocation,
                 subtotal: Number(linesTotal) || 0,
                 taxAmount: Number(tax) || 0,
                 cgst: Number(cgst) || 0,
@@ -1296,7 +1300,7 @@ function InvoiceViewModal({ invoice, onClose }) {
                         </div>
                         <div className="text-right">
                             <h2 className="text-lg font-bold text-slate-800 uppercase">{settings?.company?.name || 'MAB CHEMICALS PVT. LTD.'}</h2>
-                            <p className="text-sm text-slate-500">GSTIN: {settings?.company?.gstin || '27ABCDE1234F1Z5'}</p>
+                            <p className="text-sm text-slate-500">GSTIN: {invoice.sellerGSTIN || settings?.company?.gstin || '27ABCDE1234F1Z5'}</p>
                             <p className="text-sm text-slate-500 whitespace-pre-wrap max-w-[200px] ml-auto">{settings?.company?.address || 'Maharashtra, India'}</p>
                         </div>
                     </div>

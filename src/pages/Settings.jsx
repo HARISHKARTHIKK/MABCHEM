@@ -333,6 +333,10 @@ export default function Settings() {
                                                     <label className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Start Inv #</label>
                                                     <input type="number" placeholder="1001" className="w-full p-2.5 border rounded-lg text-sm font-mono font-bold" value={loc.nextNumber || ''} onChange={e => handleLocationChange(idx, 'nextNumber', parseInt(e.target.value) || 0)} />
                                                 </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] text-slate-500 uppercase font-black tracking-widest">GSTIN (Optional)</label>
+                                                    <input type="text" placeholder="Location GSTIN" className="w-full p-2.5 border rounded-lg text-sm font-mono uppercase font-bold" value={loc.gstin || ''} onChange={e => handleLocationChange(idx, 'gstin', e.target.value.toUpperCase())} />
+                                                </div>
                                             </div>
                                             <div className="flex justify-end pt-3 border-t border-slate-50 gap-2">
                                                 <button onClick={() => removeLocation(idx)} className="p-2 hover:bg-rose-50 text-rose-500 rounded-lg transition-colors border border-transparent hover:border-rose-100">

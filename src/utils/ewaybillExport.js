@@ -38,14 +38,14 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
         docNo: invoiceNo,
         docDate: docDate,
 
-        // Dispatcher Details (from Settings)
-        fromGstin: company.gstin || import.meta.env.VITE_COMPANY_GSTIN || "DUMMY_GSTIN",
+        // Dispatcher Details (from Invoice/Settings)
+        fromGstin: invoiceData.sellerGSTIN || company.gstin || import.meta.env.VITE_COMPANY_GSTIN || "DUMMY_GSTIN",
         fromTrdName: (company.name || "MAB CHEM").substring(0, 100),
         fromAddr1: (company.address || "OFFICE ADDRESS").substring(0, 100),
         fromAddr2: "",
         fromPlace: fromLocation || "WAREHOUSE",
         fromPincode: Number(company.pincode) || Number(company.pinCode) || 600001,
-        fromStateCode: 33, // Default state code (Tamil Nadu)
+        fromStateCode: Number((invoiceData.sellerGSTIN || company.gstin || "33").substring(0, 2)) || 33,
 
         // Recipient Details (from Invoice/Customer)
         toGstin: customerGSTIN || "DUMMY_GSTIN",
@@ -54,7 +54,7 @@ export const generateEwayBillJSON = (invoiceData, settings) => {
         toAddr2: "",
         toPlace: "DESTINATION",
         toPincode: Number(destinationPincode) || 600001,
-        toStateCode: 33,
+        toStateCode: Number((customerGSTIN || "33").substring(0, 2)) || 33,
 
         transactionType: 1, // Regular
         dispatchFromPincode: Number(company.pincode) || Number(company.pinCode) || 600001,
