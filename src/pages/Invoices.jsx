@@ -9,6 +9,7 @@ import { createInvoice, updateInvoice } from '../services/firestoreService';
 import { format } from 'date-fns';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import { validateEInvoice } from '../utils/eInvoiceValidator';
 
 export default function Invoices() {
     const { userRole } = useAuth();
@@ -24,6 +25,7 @@ export default function Invoices() {
     const [generatingEway, setGeneratingEway] = useState({}); // Tracking loading by ID
     const [copiedId, setCopiedId] = useState(null);
     const [toast, setToast] = useState(null);
+    const [validationErrors, setValidationErrors] = useState(null);
     const location = useLocation();
 
     const showToast = (message) => {
@@ -106,6 +108,17 @@ export default function Invoices() {
         e.stopPropagation();
         try {
             const jsonData = generateEwayBillJSON(inv, settings);
+
+            // Non-intrusive validation layer
+            const validation = validateEInvoice(jsonData);
+            if (!validation.isValid) {
+                setValidationErrors({
+                    invoiceNo: inv.invoiceNo,
+                    errors: validation.errors
+                });
+                return;
+            }
+
             downloadJSON(`EWB_Invoice_${inv.invoiceNo}.json`, jsonData);
             showToast('JSON Exported! Upload this file to the E-Way Bill portal.');
         } catch (error) {
@@ -380,6 +393,13 @@ export default function Invoices() {
 
             {selectedInvoice && (
                 <InvoiceViewModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
+            )}
+
+            {validationErrors && (
+                <ValidationErrorModal
+                    data={validationErrors}
+                    onClose={() => setValidationErrors(null)}
+                />
             )}
 
             {toast && (
@@ -1385,6 +1405,54 @@ function InvoiceViewModal({ invoice, onClose }) {
                                 <span>₹ {Number(invoice.totalAmount).toFixed(1)}</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ValidationErrorModal({ data, onClose }) {
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-rose-100 dark:border-rose-900/30 animate-in zoom-in-95 duration-200">
+                <div className="p-4 border-b border-rose-50 dark:border-rose-900/20 flex justify-between items-center bg-rose-50 dark:bg-rose-900/10">
+                    <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                        <AlertTriangle className="h-5 w-5" />
+                        <h3 className="font-black text-sm uppercase tracking-wider">Validation Failed</h3>
+                    </div>
+                    <button onClick={onClose} className="p-1 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-full transition-colors">
+                        <X className="h-5 w-5 text-rose-500" />
+                    </button>
+                </div>
+
+                <div className="p-6">
+                    <div className="mb-4">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Invoice Number</p>
+                        <p className="font-mono text-lg font-bold text-slate-700 dark:text-slate-200">{data.invoiceNo}</p>
+                    </div>
+
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        {data.errors.map((err, idx) => (
+                            <div key={idx} className="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900/30 flex gap-3">
+                                <div className="h-5 w-5 rounded-full bg-rose-200 dark:bg-rose-800 flex items-center justify-center shrink-0 mt-0.5">
+                                    <span className="text-[10px] font-black text-rose-700 dark:text-rose-300">{idx + 1}</span>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[9px] font-black text-rose-400 uppercase tracking-tight leading-none">{err.field}</p>
+                                    <p className="text-xs font-bold text-rose-900 dark:text-rose-200 leading-tight">{err.message}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-700">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                        >
+                            Review & Fix Errors
+                        </button>
                     </div>
                 </div>
             </div>
