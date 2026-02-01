@@ -65,11 +65,6 @@ export default function Transporters() {
             return;
         }
 
-        if (!formData.gstin) {
-            alert("GST Number / Transporter ID is mandatory.");
-            return;
-        }
-
         try {
             if (editingTransporter) {
                 await updateTransporter(editingTransporter.id, { ...formData, gstin: formData.gstin.toUpperCase() });
@@ -152,7 +147,7 @@ export default function Transporters() {
                                         <div className="font-medium text-slate-900">{transporter.name}</div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block">{transporter.gstin || 'MISSING'}</div>
+                                        <div className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block">{transporter.gstin || 'No GSTIN'}</div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2 text-slate-600">
@@ -208,10 +203,9 @@ export default function Transporters() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-slate-700">GST Number / Transporter ID</label>
+                                    <label className="text-sm font-medium text-slate-700">GST Number / Transporter ID (Optional)</label>
                                     <input
                                         type="text"
-                                        required
                                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all uppercase font-mono"
                                         placeholder="15-digit GSTIN"
                                         value={formData.gstin}
