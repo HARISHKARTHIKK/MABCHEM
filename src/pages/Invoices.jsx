@@ -104,12 +104,19 @@ export default function Invoices() {
         exportToCSV('invoices_export.csv', dataToExport);
     };
 
-    const handleExportJSON = (e, inv) => {
+    const handleExportJSON = async (e, inv) => {
         e.stopPropagation();
+        if (generatingEway[inv.id]) return;
+
+        setGeneratingEway(prev => ({ ...prev, [inv.id]: true }));
+
+        // Small delay to simulate processing and give visual feedback (UX requirement)
+        await new Promise(resolve => setTimeout(resolve, 600));
+
         try {
             const jsonData = generateEwayBillJSON(inv, settings);
 
-            // Non-intrusive validation layer
+            // Smart validation layer with mapped error messages
             const validation = validateEInvoice(jsonData);
             if (!validation.isValid) {
                 setValidationErrors({
@@ -119,11 +126,18 @@ export default function Invoices() {
                 return;
             }
 
-            downloadJSON(`EWB_Invoice_${inv.invoiceNo}.json`, jsonData);
-            showToast('JSON Exported! Upload this file to the E-Way Bill portal.');
+            // Smart Auto File Naming
+            // Name format: EINV_<InvoiceNo>_<BuyerGSTIN>.json
+            const buyerGst = jsonData.toGstin || 'NO_GSTIN';
+            const fileName = `EINV_${inv.invoiceNo}_${buyerGst}.json`;
+
+            downloadJSON(fileName, jsonData);
+            showToast('E-Invoice JSON ready. Upload to IRP portal.');
         } catch (error) {
             console.error("JSON Export Error:", error);
             alert("Failed to export JSON: " + error.message);
+        } finally {
+            setGeneratingEway(prev => ({ ...prev, [inv.id]: false }));
         }
     };
 
@@ -278,10 +292,15 @@ export default function Invoices() {
                                                         <div className="flex flex-row gap-1.5">
                                                             <button
                                                                 onClick={(e) => handleExportJSON(e, inv)}
-                                                                title="Export E-Way JSON"
-                                                                className="flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-amber-50 text-amber-600 hover:bg-amber-100 hover:shadow-amber-100/50 hover:scale-105 active:scale-95"
+                                                                disabled={generatingEway[inv.id]}
+                                                                title="Export E-Invoice JSON"
+                                                                className={`flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-amber-50 text-amber-600 hover:bg-amber-100 hover:shadow-amber-100/50 hover:scale-105 active:scale-95 ${generatingEway[inv.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                             >
-                                                                <Download className="h-4 w-4 fill-amber-500 text-amber-500" />
+                                                                {generatingEway[inv.id] ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                ) : (
+                                                                    <Download className="h-4 w-4 fill-amber-500 text-amber-500" />
+                                                                )}
                                                             </button>
                                                             <a
                                                                 href="https://einvoice1.gst.gov.in/"

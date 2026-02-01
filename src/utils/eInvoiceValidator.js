@@ -5,21 +5,40 @@
 export const validateEInvoice = (jsonData) => {
     const errors = [];
 
+    // Mapping technical fields to human readable names
+    const fieldMapping = {
+        'docNo': 'Invoice Number',
+        'docDate': 'Invoice Date',
+        'fromGstin': 'Seller GSTIN',
+        'toGstin': 'Buyer GSTIN',
+        'itemList': 'Item List',
+        'totalValue': 'Taxable Amount',
+        'totInvValue': 'Total Invoice Value',
+        'fromStateCode': 'Seller State Code',
+        'toStateCode': 'Buyer State Code',
+        'hsnCode': 'HSN Code',
+        'taxableAmount': 'Taxable Amount',
+        'taxRate': 'GST Rate',
+        'igstRate': 'IGST Rate',
+        'cgstRate': 'CGST/SGST Rate'
+    };
+
     // Helper to add error
     const addError = (field, message) => {
-        errors.push({ field, message });
+        const friendlyField = fieldMapping[field] || field;
+        errors.push({ field: friendlyField, techField: field, message });
     };
 
     // 1. Mandatory Fields & Basic Schema
     const mandatoryFields = ['docNo', 'docDate', 'fromGstin', 'toGstin', 'itemList', 'totalValue', 'totInvValue'];
     mandatoryFields.forEach(field => {
         if (!jsonData[field]) {
-            addError(field, `Mandatory field ${field} is missing`);
+            addError(field, `This field is missing but required for E-Invoice`);
         }
     });
 
     if (!jsonData.itemList || !Array.isArray(jsonData.itemList) || jsonData.itemList.length === 0) {
-        addError('itemList', 'At least one item is required');
+        addError('itemList', 'At least one item is required in the invoice');
     }
 
     // 2. GSTIN Validation
@@ -27,17 +46,17 @@ export const validateEInvoice = (jsonData) => {
 
     if (jsonData.fromGstin) {
         if (jsonData.fromGstin.length !== 15) {
-            addError('fromGstin', 'Seller GSTIN must be 15 characters');
+            addError('fromGstin', 'Seller GSTIN must be exactly 15 characters');
         } else if (!gstinRegex.test(jsonData.fromGstin) && jsonData.fromGstin !== 'DUMMY_GSTIN') {
-            addError('fromGstin', 'Invalid Seller GSTIN format');
+            addError('fromGstin', 'Seller GSTIN format is incorrect');
         }
     }
 
     if (jsonData.toGstin) {
         if (jsonData.toGstin.length !== 15) {
-            addError('toGstin', 'Buyer GSTIN must be 15 characters');
+            addError('toGstin', 'Buyer GSTIN must be exactly 15 characters');
         } else if (!gstinRegex.test(jsonData.toGstin) && jsonData.toGstin !== 'DUMMY_GSTIN') {
-            addError('toGstin', 'Invalid Buyer GSTIN format');
+            addError('toGstin', 'Buyer GSTIN format is incorrect');
         }
     }
 
@@ -77,17 +96,17 @@ export const validateEInvoice = (jsonData) => {
     // 5. Item Level Validation
     let calculatedTotalTaxable = 0;
     jsonData.itemList?.forEach((item, index) => {
-        const prefix = `itemList[${index}]`;
+        const prefix = `Item ${index + 1}`;
 
         // HSN Validation
         const hsn = String(item.hsnCode);
         if (![4, 6, 8].includes(hsn.length)) {
-            addError(`${prefix}.hsnCode`, 'HSN code length must be 4, 6, or 8 digits');
+            addError(`${prefix} HSN Code`, 'HSN code length must be 4, 6, or 8 digits');
         }
 
-        // Taxable Value
+        // Taxable Amount
         if (item.taxableAmount < 0) {
-            addError(`${prefix}.taxableAmount`, 'Taxable value cannot be negative');
+            addError(`${prefix} Taxable Amount`, 'Taxable value cannot be negative');
         }
         calculatedTotalTaxable += Number(item.taxableAmount);
 
@@ -95,18 +114,18 @@ export const validateEInvoice = (jsonData) => {
         const allowedRates = [0, 5, 12, 18, 28];
         const itemTotalRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.igstRate || 0);
         if (!allowedRates.includes(itemTotalRate)) {
-            addError(`${prefix}.taxRate`, `Invalid GST Rate: ${itemTotalRate}%`);
+            addError(`${prefix} GST Rate`, `Invalid GST Rate: ${itemTotalRate}%`);
         }
 
         // CGST/SGST vs IGST Logic
         const isIntrastate = jsonData.fromStateCode === jsonData.toStateCode;
         if (isIntrastate) {
             if (item.igstRate > 0) {
-                addError(`${prefix}.igstRate`, 'IGST cannot be charged for Intrastate supply');
+                addError(`${prefix} IGST Rate`, 'IGST cannot be charged for Intrastate supply');
             }
         } else {
             if (item.cgstRate > 0 || item.sgstRate > 0) {
-                addError(`${prefix}.cgstRate`, 'CGST/SGST cannot be charged for Interstate supply');
+                addError(`${prefix} CGST/SGST Rate`, 'CGST/SGST cannot be charged for Interstate supply');
             }
         }
     });
@@ -117,7 +136,7 @@ export const validateEInvoice = (jsonData) => {
 
     const tolerance = 2.0; // Allow small rounding differences
     if (Math.abs(calculatedTotalValue - Number(jsonData.totInvValue)) > tolerance) {
-        addError('totInvValue', `Invoice total mismatch: Calculated ${calculatedTotalValue.toFixed(2)}, Found ${jsonData.totInvValue}`);
+        addError('totInvValue', `Invoice total calculation is incorrect: Calculated ${calculatedTotalValue.toFixed(2)}, Found ${jsonData.totInvValue}`);
     }
 
     if (Math.abs(calculatedTotalTaxable - Number(jsonData.totalValue)) > tolerance) {
