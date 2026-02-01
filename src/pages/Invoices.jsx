@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { exportToCSV } from '../utils/exportToCSV';
-import { generateEwayBillJSON, downloadJSON } from '../utils/ewaybillExport';
+import { generateEInvoiceJSON, generateEwayBillJSON, downloadJSON } from '../utils/ewaybillExport';
 import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn, Clock, Edit2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
@@ -114,9 +114,9 @@ export default function Invoices() {
         await new Promise(resolve => setTimeout(resolve, 600));
 
         try {
-            const jsonData = generateEwayBillJSON(inv, settings);
+            const jsonData = generateEInvoiceJSON(inv, settings);
 
-            // Smart validation layer with mapped error messages
+            // Smart validation layer with mapped error messages (NIC ARRAY FORMAT)
             const validation = validateEInvoice(jsonData);
             if (!validation.isValid) {
                 setValidationErrors({
@@ -128,7 +128,7 @@ export default function Invoices() {
 
             // Smart Auto File Naming
             // Name format: EINV_<InvoiceNo>_<BuyerGSTIN>.json
-            const buyerGst = jsonData.toGstin || 'NO_GSTIN';
+            const buyerGst = jsonData[0]?.BuyerDtls?.Gstin || 'NO_GSTIN';
             const fileName = `EINV_${inv.invoiceNo}_${buyerGst}.json`;
 
             downloadJSON(fileName, jsonData);
