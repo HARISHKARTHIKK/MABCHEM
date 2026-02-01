@@ -144,51 +144,54 @@ export default function Dashboard() {
             return new Date(0);
         };
 
-        // Current real-time total stock as the anchor
-        const globalCurrentStock = products.reduce((sum, p) => {
-            const locStock = Object.values(p.locations || {}).reduce((a, b) => a + (Number(b) || 0), 0);
-            return sum + locStock;
-        }, 0);
-
-        // Group all logs by month to facilitate backward calculation
-        const allLogs = [...allImports, ...allPurchases, ...allDispatches].map(item => ({
-            ...item,
-            _date: parseDate(item),
-            _isInward: !item.invoiceNo || (item.type === 'IMPORT' || item.type === 'LOCAL')
-        }));
-
-        // 1. Calculate stats for the SELECTED month specifically
-        const selectedMonthInward = allLogs
-            .filter(l => l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
-            .reduce((sum, l) => sum + getQty(l), 0);
-
-        const selectedMonthDispatch = allDispatches
-            .filter(l => {
-                const d = parseDate(l);
-                return d >= startOfSelected && d <= endOfSelected;
-            })
-            .reduce((sum, l) => sum + getQty(l), 0);
-
-        // 2. Backward calculation for Opening Stock
-        // We start from Today and subtract/add changes for every month until we reach the selected month
-        let computedNetAtEndOfSelected = globalCurrentStock;
-
-        // If selected month is in the past, we need to subtract all changes from (SelectedMonth + 1) until Now
-        if (!isCurrentMonth && startOfSelected < startOfMonth(now)) {
-            const logsAfterSelected = allLogs.filter(l => l._date > endOfSelected);
-            const netChangeSinceSelected = logsAfterSelected.reduce((sum, l) => {
-                return sum + (l._isInward ? getQty(l) : -getQty(l));
+        const computeStatsForLocation = (locName) => {
+            // Current real-time total stock for this specific location
+            const currentStockLoc = products.reduce((sum, p) => {
+                const qty = Number(p.locations?.[locName]) || 0;
+                return sum + qty;
             }, 0);
-            computedNetAtEndOfSelected = globalCurrentStock - netChangeSinceSelected;
-        }
 
-        const openingStock = computedNetAtEndOfSelected - (selectedMonthInward - selectedMonthDispatch);
+            // Group all logs by month to facilitate backward calculation
+            const allLogsLoc = [...allImports, ...allPurchases, ...allDispatches]
+                .filter(l => l.location === locName)
+                .map(item => ({
+                    ...item,
+                    _date: parseDate(item),
+                    _isInward: !item.invoiceNo || (item.type === 'IMPORT' || item.type === 'LOCAL')
+                }));
+
+            // Calculate stats for the SELECTED month specifically for this location
+            const inward = allLogsLoc
+                .filter(l => l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
+                .reduce((sum, l) => sum + getQty(l), 0);
+
+            const dispatch = allLogsLoc
+                .filter(l => !l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
+                .reduce((sum, l) => sum + getQty(l), 0);
+
+            // Backward calculation for Opening Stock
+            let netAtEndOfSelected = currentStockLoc;
+            if (!isCurrentMonth && startOfSelected < startOfMonth(now)) {
+                const logsAfterSelected = allLogsLoc.filter(l => l._date > endOfSelected);
+                const netChangeSinceSelected = logsAfterSelected.reduce((sum, l) => {
+                    return sum + (l._isInward ? getQty(l) : -getQty(l));
+                }, 0);
+                netAtEndOfSelected = currentStockLoc - netChangeSinceSelected;
+            }
+
+            const opening = netAtEndOfSelected - (inward - dispatch);
+
+            return {
+                opening: Number(opening.toFixed(2)),
+                inward: Number(inward.toFixed(2)),
+                dispatch: Number(dispatch.toFixed(2)),
+                net: Number(netAtEndOfSelected.toFixed(2))
+            };
+        };
 
         return {
-            opening: Number(openingStock.toFixed(2)),
-            inward: Number(selectedMonthInward.toFixed(2)),
-            dispatch: Number(selectedMonthDispatch.toFixed(2)),
-            net: Number(computedNetAtEndOfSelected.toFixed(2)),
+            CHENNAI: computeStatsForLocation('CHENNAI'),
+            MUNDRA: computeStatsForLocation('MUNDRA'),
             lastUpdated: new Date()
         };
     }, [products, allImports, allPurchases, allDispatches, stockSnapshots, selectedMonth]);
@@ -339,50 +342,82 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                     {/* Opening Stock */}
-                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
-                        <div className="flex justify-between items-start mb-1">
+                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-2">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Opening Stock</span>
                             <Box className="h-3.5 w-3.5 text-slate-300" />
                         </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-slate-800 dark:text-slate-100">{monthlySummary.opening.toLocaleString()}</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">mts</span>
+                        <div className="space-y-1 mb-2">
+                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                                <div key={loc} className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 px-2 py-0.5 rounded">
+                                    <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-sm font-black text-slate-700 dark:text-slate-200">{(monthlySummary[loc]?.opening || 0).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
+                            <span className="text-[10px] font-bold text-slate-500">{(monthlySummary.CHENNAI.opening + monthlySummary.MUNDRA.opening).toLocaleString()}</span>
+                            <span className="text-[8px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
 
                     {/* Total Inward */}
-                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
-                        <div className="flex justify-between items-start mb-1">
+                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-2">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Inward</span>
                             <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
                         </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">+{monthlySummary.inward.toLocaleString()}</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">mts</span>
+                        <div className="space-y-1 mb-2">
+                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                                <div key={loc} className="flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-900/10 px-2 py-0.5 rounded">
+                                    <span className="text-[8px] font-extrabold text-emerald-400 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">+{(monthlySummary[loc]?.inward || 0).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
+                            <span className="text-[10px] font-bold text-emerald-600">{(monthlySummary.CHENNAI.inward + monthlySummary.MUNDRA.inward).toLocaleString()}</span>
+                            <span className="text-[8px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
 
                     {/* Total Dispatch */}
-                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
-                        <div className="flex justify-between items-start mb-1">
+                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-2">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Dispatch</span>
                             <ArrowDownRight className="h-3.5 w-3.5 text-rose-500" />
                         </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-rose-600 dark:text-rose-400">-{monthlySummary.dispatch.toLocaleString()}</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">mts</span>
+                        <div className="space-y-1 mb-2">
+                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                                <div key={loc} className="flex justify-between items-center bg-rose-50/30 dark:bg-rose-900/10 px-2 py-0.5 rounded">
+                                    <span className="text-[8px] font-extrabold text-rose-400 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-sm font-black text-rose-600 dark:text-rose-400">-{(monthlySummary[loc]?.dispatch || 0).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
+                            <span className="text-[10px] font-bold text-rose-600">{(monthlySummary.CHENNAI.dispatch + monthlySummary.MUNDRA.dispatch).toLocaleString()}</span>
+                            <span className="text-[8px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
 
                     {/* Net Stock In Hand */}
-                    <div className="bg-blue-50/30 dark:bg-blue-900/10 p-3 rounded-lg border border-blue-100 dark:border-blue-900 shadow-sm">
-                        <div className="flex justify-between items-start mb-1">
+                    <div className="bg-blue-50/30 dark:bg-blue-900/10 p-3 rounded-lg border border-blue-100 dark:border-blue-900 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-2">
                             <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Net Stock In-Hand</span>
                             <Package className="h-3.5 w-3.5 text-blue-500" />
                         </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-blue-700 dark:text-blue-300">{monthlySummary.net.toLocaleString()}</span>
-                            <span className="text-[9px] font-bold text-blue-400 uppercase tracking-tighter">mts</span>
+                        <div className="space-y-1 mb-2">
+                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                                <div key={loc} className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
+                                    <span className="text-[8px] font-extrabold text-blue-500 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-sm font-black text-blue-700 dark:text-blue-300">{(monthlySummary[loc]?.net || 0).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-baseline gap-1 border-t border-blue-200 dark:border-blue-800 pt-1">
+                            <span className="text-[10px] font-bold text-blue-700">{(monthlySummary.CHENNAI.net + monthlySummary.MUNDRA.net).toLocaleString()}</span>
+                            <span className="text-[8px] text-blue-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
                 </div>
