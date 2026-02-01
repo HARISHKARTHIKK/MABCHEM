@@ -405,6 +405,222 @@ export const createInvoice = async (invoice, items, fromLocation) => {
     });
 };
 
+export const updateInvoice = async (invoiceId, updatedInvoice, updatedItems, fromLocation) => {
+    const auth = getAuth();
+    if (!auth.currentUser) throw new Error("User not authenticated");
+    const uid = auth.currentUser.uid;
+
+    if (!fromLocation) throw new Error("Dispatch location is required.");
+    if (!updatedInvoice.invoiceNo) throw new Error("Invoice Number is required.");
+
+    // Fetch old data
+    const oldInvoiceRef = doc(db, 'invoices', invoiceId);
+    const oldInvoiceSnap = await getDoc(oldInvoiceRef);
+    if (!oldInvoiceSnap.exists()) throw new Error("Original invoice not found.");
+    const oldInvoice = oldInvoiceSnap.data();
+
+    // Fetch old items
+    const qOldItems = query(collection(db, "invoiceItems"), where("invoiceId", "==", invoiceId));
+    const oldItemsSnap = await getDocs(qOldItems);
+    const oldItems = oldItemsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    return await runTransaction(db, async (transaction) => {
+        // 1. COLLECT ALL RELEVANT PRODUCT & PO IDs
+        const allProductIds = [...new Set([
+            ...oldItems.map(i => i.productId),
+            ...updatedItems.map(i => i.productId)
+        ])];
+        const allPOIds = [...new Set([
+            ...oldItems.filter(i => i.purchaseOrderId).map(i => i.purchaseOrderId),
+            ...updatedItems.filter(i => i.purchaseOrderId).map(i => i.purchaseOrderId)
+        ])];
+
+        // 2. READ ALL NECESSARY DOCUMENTS
+        const productSnaps = await Promise.all(allProductIds.map(id => transaction.get(doc(db, "products", id))));
+        const poSnaps = await Promise.all(allPOIds.map(id => transaction.get(doc(db, "purchaseOrders", id))));
+
+        const productMap = {};
+        productSnaps.forEach(snap => { if (snap.exists()) productMap[snap.id] = snap.data(); });
+
+        const poMap = {};
+        poSnaps.forEach(snap => { if (snap.exists()) poMap[snap.id] = snap.data(); });
+
+        // 3. CALCULATE STOCK CHANGES
+        const stockChanges = {}; // productId -> { location -> delta }
+
+        // Add back old quantities
+        oldItems.forEach(item => {
+            if (!stockChanges[item.productId]) stockChanges[item.productId] = {};
+            const loc = oldInvoice.fromLocation;
+            stockChanges[item.productId][loc] = (stockChanges[item.productId][loc] || 0) + Number(item.quantity);
+        });
+
+        // Subtract new quantities
+        updatedItems.forEach(item => {
+            if (!stockChanges[item.productId]) stockChanges[item.productId] = {};
+            const loc = fromLocation;
+            stockChanges[item.productId][loc] = (stockChanges[item.productId][loc] || 0) - Number(item.quantity);
+        });
+
+        // 4. CALCULATE PO CHANGES
+        const updatedPOs = {}; // poId -> items array
+
+        // Reverse old PO deliveries
+        oldItems.forEach(item => {
+            if (item.purchaseOrderId && poMap[item.purchaseOrderId]) {
+                if (!updatedPOs[item.purchaseOrderId]) updatedPOs[item.purchaseOrderId] = JSON.parse(JSON.stringify(poMap[item.purchaseOrderId].items));
+                const poItems = updatedPOs[item.purchaseOrderId];
+                const poItemIndex = poItems.findIndex(i => i.productId === item.productId);
+                if (poItemIndex !== -1) {
+                    poItems[poItemIndex].deliveredQty = Number((Number(poItems[poItemIndex].deliveredQty || 0) - Number(item.quantity)).toFixed(2));
+                    poItems[poItemIndex].remainingQty = Number((Number(poItems[poItemIndex].totalQty) - poItems[poItemIndex].deliveredQty).toFixed(2));
+                    if (poItems[poItemIndex].fulfillments) {
+                        poItems[poItemIndex].fulfillments = poItems[poItemIndex].fulfillments.filter(f => f.invoiceNo !== oldInvoice.invoiceNo);
+                    }
+                }
+            }
+        });
+
+        // Apply new PO deliveries
+        updatedItems.forEach(item => {
+            if (item.purchaseOrderId && poMap[item.purchaseOrderId]) {
+                if (!updatedPOs[item.purchaseOrderId]) updatedPOs[item.purchaseOrderId] = JSON.parse(JSON.stringify(poMap[item.purchaseOrderId].items));
+                const poItems = updatedPOs[item.purchaseOrderId];
+                const poItemIndex = poItems.findIndex(i => i.productId === item.productId);
+                if (poItemIndex !== -1) {
+                    poItems[poItemIndex].deliveredQty = Number((Number(poItems[poItemIndex].deliveredQty || 0) + Number(item.quantity)).toFixed(2));
+                    poItems[poItemIndex].remainingQty = Number((Number(poItems[poItemIndex].totalQty) - poItems[poItemIndex].deliveredQty).toFixed(2));
+                    if (!poItems[poItemIndex].fulfillments) poItems[poItemIndex].fulfillments = [];
+                    poItems[poItemIndex].fulfillments.push({
+                        invoiceNo: updatedInvoice.invoiceNo,
+                        quantity: Number(item.quantity),
+                        date: new Date().toISOString().split('T')[0]
+                    });
+                }
+            }
+        });
+
+        // 5. PERFORM UPDATES
+
+        // Update Products
+        for (const productId of allProductIds) {
+            const productRef = doc(db, "products", productId);
+            const productData = productMap[productId];
+            if (productData) {
+                const locations = { ...productData.locations };
+                const changes = stockChanges[productId];
+                for (const loc in changes) {
+                    locations[loc] = Number(((Number(locations[loc]) || 0) + changes[loc]).toFixed(1));
+                }
+                const newTotalStock = Object.values(locations).reduce((a, b) => a + (Number(b) || 0), 0);
+                transaction.update(productRef, {
+                    locations,
+                    stockQty: Number(newTotalStock.toFixed(1)),
+                    updatedAt: serverTimestamp()
+                });
+            }
+        }
+
+        // Update POs
+        for (const poId in updatedPOs) {
+            const poItems = updatedPOs[poId];
+            transaction.update(doc(db, "purchaseOrders", poId), {
+                items: poItems,
+                status: poItems.every(i => Number(i.remainingQty) <= 0) ? 'Completed' : (poItems.every(i => Number(i.deliveredQty) === 0) ? 'Open' : 'Partially Fulfilled'),
+                updatedAt: serverTimestamp()
+            });
+        }
+
+        // Delete old sub-records
+        const qMovements = query(collection(db, "stockMovements"), where("relatedInvoiceId", "==", invoiceId));
+        const moveSnaps = await getDocs(qMovements);
+        moveSnaps.forEach(d => transaction.delete(d.ref));
+
+        const qDispatches = query(collection(db, "dispatches"), where("invoiceId", "==", invoiceId));
+        const dispSnaps = await getDocs(qDispatches);
+        dispSnaps.forEach(d => transaction.delete(d.ref));
+
+        oldItemsSnap.forEach(d => transaction.delete(d.ref));
+
+        // Create new sub-records
+        for (const item of updatedItems) {
+            const qty = Number(item.quantity);
+            const price = Number(item.price);
+
+            // Invoice Item
+            const itemRef = doc(collection(db, "invoiceItems"));
+            transaction.set(itemRef, {
+                invoiceId: invoiceId,
+                productId: item.productId,
+                productName: item.name || item.productName || '',
+                quantity: qty,
+                price: price,
+                userId: uid,
+                createdAt: serverTimestamp()
+            });
+
+            // Stock Movement
+            const moveRef = doc(collection(db, "stockMovements"));
+            transaction.set(moveRef, {
+                productId: item.productId,
+                productName: item.name || item.productName || '',
+                location: fromLocation,
+                changeQty: -qty,
+                type: 'INVOICE_EDIT',
+                reason: `Invoice #${updatedInvoice.invoiceNo} (EDITED)`,
+                relatedInvoiceId: invoiceId,
+                transport: updatedInvoice.transport || {},
+                userId: uid,
+                createdAt: serverTimestamp()
+            });
+
+            // Dispatch
+            const dispatchRef = doc(collection(db, "dispatches"));
+            const taxRate = Number(updatedInvoice.taxRate) || 18;
+            const itemSubtotal = qty * price;
+            const itemTax = itemSubtotal * (taxRate / 100);
+            const itemTotal = itemSubtotal + itemTax;
+
+            transaction.set(dispatchRef, {
+                invoiceId: invoiceId,
+                invoiceNo: updatedInvoice.invoiceNo,
+                customerName: updatedInvoice.customerName || '',
+                remarks: updatedInvoice.remarks || '',
+                productId: item.productId,
+                productName: item.name || item.productName || '',
+                quantity: qty,
+                bags: Number(item.bags) || 0,
+                bagWeight: Number(item.bagWeight) || 0,
+                unitPrice: price,
+                taxRate: taxRate,
+                taxAmount: Number(itemTax.toFixed(2)),
+                itemTotal: Number(itemTotal.toFixed(2)),
+                location: fromLocation,
+                transport: updatedInvoice.transport || {},
+                userId: uid,
+                createdAt: serverTimestamp()
+            });
+        }
+
+        // Update main Invoice document
+        transaction.update(oldInvoiceRef, {
+            ...updatedInvoice,
+            fromLocation,
+            itemsSummary: updatedItems.map(item => ({
+                productId: item.productId,
+                productName: item.name || item.productName || '',
+                quantity: Number(item.quantity),
+                price: Number(item.price),
+                bags: Number(item.bags) || 0,
+                bagWeight: Number(item.bagWeight) || 0,
+                hsnCode: item.hsnCode || '',
+                purchaseOrderId: item.purchaseOrderId || null
+            })),
+            updatedAt: serverTimestamp()
+        });
+    });
+};
+
 /* =========================
    BACKFILL / MAINTENANCE
    ========================= */

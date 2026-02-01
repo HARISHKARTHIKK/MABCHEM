@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { exportToCSV } from '../utils/exportToCSV';
 import { generateEwayBillJSON, downloadJSON } from '../utils/ewaybillExport';
-import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn, Clock } from 'lucide-react';
+import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn, Clock, Edit2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
-import { createInvoice } from '../services/firestoreService';
+import { createInvoice, updateInvoice } from '../services/firestoreService';
 import { format } from 'date-fns';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
@@ -13,13 +13,14 @@ import { useAuth } from '../context/AuthContext';
 export default function Invoices() {
     const { userRole } = useAuth();
     const { settings } = useSettings();
-    const [view, setView] = useState('list'); // 'list' or 'create'
+    const [view, setView] = useState('list'); // 'list', 'create', or 'edit'
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [editingInvoice, setEditingInvoice] = useState(null);
     const [generatingEway, setGeneratingEway] = useState({}); // Tracking loading by ID
     const [copiedId, setCopiedId] = useState(null);
     const [toast, setToast] = useState(null);
@@ -122,6 +123,10 @@ export default function Invoices() {
 
     if (view === 'create') {
         return <CreateInvoice onCancel={() => setView('list')} onSuccess={() => setView('list')} />;
+    }
+
+    if (view === 'edit' && editingInvoice) {
+        return <CreateInvoice invoice={editingInvoice} onCancel={() => { setView('list'); setEditingInvoice(null); }} onSuccess={() => { setView('list'); setEditingInvoice(null); }} />;
     }
 
     if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" /></div>;
@@ -282,13 +287,24 @@ export default function Invoices() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => setSelectedInvoice(inv)}
-                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                                            title="View Invoice"
-                                        >
-                                            <FileText className="h-4 w-4" />
-                                        </button>
+                                        <div className="flex justify-end gap-1">
+                                            {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
+                                                <button
+                                                    onClick={() => { setEditingInvoice(inv); setView('edit'); }}
+                                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-full transition-colors"
+                                                    title="Edit Invoice"
+                                                >
+                                                    <Edit2 className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => setSelectedInvoice(inv)}
+                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                                                title="View Invoice"
+                                            >
+                                                <FileText className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -338,9 +354,19 @@ export default function Invoices() {
                                 <div className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
                                     {inv.customerName}
                                 </div>
-                                <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded uppercase tracking-tighter">
-                                    <MapPin className="h-3 w-3 text-blue-500" /> {inv.fromLocation || '-'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded uppercase tracking-tighter">
+                                        <MapPin className="h-3 w-3 text-blue-500" /> {inv.fromLocation || '-'}
+                                    </span>
+                                    {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setView('edit'); }}
+                                            className="p-1.5 text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg transition-colors"
+                                        >
+                                            <Edit2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -377,29 +403,45 @@ export default function Invoices() {
     );
 }
 
-function CreateInvoice({ onCancel, onSuccess }) {
+function CreateInvoice({ onCancel, onSuccess, invoice }) {
     const { settings, updateSettings } = useSettings();
     const { userData } = useAuth();
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
-    const [selectedCustomer, setSelectedCustomer] = useState('');
-    const [fromLocation, setFromLocation] = useState('CHENNAI');
-    const [invoiceNo, setInvoiceNo] = useState('');
-    const [lines, setLines] = useState([{ productId: '', qty: '0', price: '0', stock: 0, bags: '', bagWeight: '' }]);
-    const [remarks, setRemarks] = useState('');
+    const [selectedCustomer, setSelectedCustomer] = useState(invoice?.customerId || '');
+    const [fromLocation, setFromLocation] = useState(invoice?.fromLocation || 'CHENNAI');
+    const [invoiceNo, setInvoiceNo] = useState(invoice?.invoiceNo || '');
+    const [lines, setLines] = useState(invoice?.itemsSummary?.map(item => ({
+        productId: item.productId,
+        name: item.productName,
+        qty: String(item.quantity),
+        price: String(item.price),
+        bags: String(item.bags || ''),
+        bagWeight: String(item.bagWeight || ''),
+        purchaseOrderId: item.purchaseOrderId || ''
+    })) || [{ productId: '', qty: '0', price: '0', stock: 0, bags: '', bagWeight: '', purchaseOrderId: '' }]);
+    const [remarks, setRemarks] = useState(invoice?.remarks || '');
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [submitting, setSubmitting] = useState(false);
 
     // New Logistics State
     const [transporters, setTransporters] = useState([]);
-    const [transporterId, setTransporterId] = useState('');
-    const [transporterGSTIN, setTransporterGSTIN] = useState('');
-    const [vehicleNumber, setVehicleNumber] = useState('');
-    const [paymentType, setPaymentType] = useState('Payable');
-    const [distance, setDistance] = useState('');
-    const [destinationPincode, setDestinationPincode] = useState('');
+    const [transporterId, setTransporterId] = useState(invoice?.transporterId || '');
+    const [transporterGSTIN, setTransporterGSTIN] = useState(invoice?.transporterGSTIN || '');
+    const [vehicleNumber, setVehicleNumber] = useState(invoice?.vehicleNumber || invoice?.transport?.vehicleNumber || '');
+    const [paymentType, setPaymentType] = useState(invoice?.paymentType || 'Payable');
+    const [distance, setDistance] = useState(invoice?.distance || '');
+    const [destinationPincode, setDestinationPincode] = useState(invoice?.destinationPincode || '');
     const [vehicleError, setVehicleError] = useState(false);
     const [isBlinking, setIsBlinking] = useState(false);
+
+    // Transport details
+    const [transport, setTransport] = useState(invoice?.transport || {
+        vehicleNumber: '',
+        amount: 0,
+        mode: 'By Road',
+        isExtra: false
+    });
 
     const validateVehicleNumber = (val) => {
         const regex = /^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$/;
@@ -421,9 +463,8 @@ function CreateInvoice({ onCancel, onSuccess }) {
     const baseLocations = settings?.locations?.filter(l => l.active).map(l => l.name) || ['CHENNAI', 'Warehouse A', 'Warehouse B', 'Store Front', 'Factory'];
     const LOCATIONS = [...new Set([...baseLocations, userData?.location].filter(Boolean))];
 
-
     useEffect(() => {
-        if (fromLocation && settings?.locations) {
+        if (fromLocation && settings?.locations && !invoice) {
             const loc = settings.locations.find(l => l.name === fromLocation);
             if (loc) {
                 const prefix = loc.prefix || 'INV';
@@ -434,14 +475,7 @@ function CreateInvoice({ onCancel, onSuccess }) {
                 }
             }
         }
-    }, [fromLocation, settings]);
-
-    const [transport, setTransport] = useState({
-        vehicleNumber: '',
-        amount: 0,
-        mode: 'By Road',
-        isExtra: false
-    });
+    }, [fromLocation, settings, invoice]);
 
     useEffect(() => {
         const qCustomers = query(collection(db, 'customers'), orderBy('name'));
@@ -546,9 +580,32 @@ function CreateInvoice({ onCancel, onSuccess }) {
         }, 0);
 
         const taxRate = settings?.invoice?.tax ?? 18;
-        const tax = linesTotal * (taxRate / 100);
+        const totalTax = linesTotal * (taxRate / 100);
+
+        // GST Splitting Logic
+        const companyGST = settings?.company?.gstin || '';
+        const selectedCustomerObj = customers.find(c => c.id === selectedCustomer);
+        const customerGST = selectedCustomerObj?.gstin || '';
+
+        const companyStateCode = companyGST.substring(0, 2);
+        const customerStateCode = customerGST.substring(0, 2);
+
+        let cgst = 0;
+        let sgst = 0;
+        let igst = 0;
+        let isIntrastate = false;
+
+        if (companyStateCode && customerStateCode && companyStateCode === customerStateCode) {
+            cgst = totalTax / 2;
+            sgst = totalTax / 2;
+            isIntrastate = true;
+        } else {
+            igst = totalTax;
+            isIntrastate = false;
+        }
+
         const transportAmt = Number(transport.amount) || 0;
-        let total = linesTotal + tax;
+        let total = linesTotal + totalTax;
         if (transport.isExtra) {
             total += transportAmt;
         }
@@ -556,7 +613,16 @@ function CreateInvoice({ onCancel, onSuccess }) {
             total = Math.round(total);
         }
         const taxableValue = linesTotal;
-        return { linesTotal, tax, total, taxableValue };
+        return {
+            linesTotal,
+            tax: totalTax,
+            total,
+            taxableValue,
+            cgst,
+            sgst,
+            igst,
+            isIntrastate
+        };
     };
 
     const handleSubmit = async () => {
@@ -574,7 +640,16 @@ function CreateInvoice({ onCancel, onSuccess }) {
                 return;
             }
             const prod = products.find(p => p.id === line.productId);
-            const globalStock = getStockAtLocation(prod);
+            let globalStock = getStockAtLocation(prod);
+
+            // If editing, add back the quantity already "used" by this invoice for validation
+            if (invoice?.itemsSummary) {
+                const originalItem = invoice.itemsSummary.find(i => i.productId === line.productId);
+                if (originalItem) {
+                    globalStock += Number(originalItem.quantity);
+                }
+            }
+
             if (globalStock < qtyVal) {
                 alert(`Insufficient global stock for ${line.name}. Available: ${globalStock.toFixed(1)}, Requested: ${qtyVal.toFixed(1)}`);
                 return;
@@ -583,7 +658,7 @@ function CreateInvoice({ onCancel, onSuccess }) {
 
         setSubmitting(true);
         try {
-            const { linesTotal, tax, total, taxableValue } = calculateTotals();
+            const { linesTotal, tax, total, taxableValue, cgst, sgst, igst, isIntrastate } = calculateTotals();
             const customerObj = customers.find(c => c.id === selectedCustomer);
 
             const preparedItems = validLines.map(l => {
@@ -598,13 +673,17 @@ function CreateInvoice({ onCancel, onSuccess }) {
                 };
             });
 
-            await createInvoice({
+            const invoiceData = {
                 invoiceNo: invoiceNo,
                 customerId: selectedCustomer,
                 customerName: customerObj?.name || 'Unknown',
                 customerGSTIN: customerObj?.gstin || '',
                 subtotal: Number(linesTotal) || 0,
                 taxAmount: Number(tax) || 0,
+                cgst: Number(cgst) || 0,
+                sgst: Number(sgst) || 0,
+                igst: Number(igst) || 0,
+                taxType: isIntrastate ? 'CGST_SGST' : 'IGST',
                 totalAmount: Number(total) || 0,
                 taxableValue: Number(taxableValue) || 0,
                 taxRate: settings?.invoice?.tax ?? 18,
@@ -623,28 +702,34 @@ function CreateInvoice({ onCancel, onSuccess }) {
                 distance: Number(distance) || 100,
                 destinationPincode: destinationPincode,
                 transportationCost: Number(transport.amount) || 0,
-                status: 'paid'
-            }, preparedItems, fromLocation);
+                status: invoice?.status || 'paid'
+            };
 
-            if (settings?.locations) {
-                const locIndex = settings.locations.findIndex(l => l.name === fromLocation);
-                if (locIndex >= 0) {
-                    const newSettings = JSON.parse(JSON.stringify(settings));
-                    const currentNext = newSettings.locations[locIndex].nextNumber || 1;
-                    newSettings.locations[locIndex].nextNumber = currentNext + 1;
-                    await updateSettings(newSettings);
+            if (invoice?.id) {
+                await updateInvoice(invoice.id, invoiceData, preparedItems, fromLocation);
+            } else {
+                await createInvoice(invoiceData, preparedItems, fromLocation);
+
+                if (settings?.locations) {
+                    const locIndex = settings.locations.findIndex(l => l.name === fromLocation);
+                    if (locIndex >= 0) {
+                        const newSettings = JSON.parse(JSON.stringify(settings));
+                        const currentNext = newSettings.locations[locIndex].nextNumber || 1;
+                        newSettings.locations[locIndex].nextNumber = currentNext + 1;
+                        await updateSettings(newSettings);
+                    }
                 }
             }
 
             onSuccess();
         } catch (error) {
-            alert("Failed to create invoice: " + error.message);
+            alert("Failed to save invoice: " + error.message);
         } finally {
             setSubmitting(false);
         }
     };
 
-    const { linesTotal, tax, total } = calculateTotals();
+    const { linesTotal, tax, total, cgst, sgst, igst, isIntrastate } = calculateTotals();
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-3 animate-fade-in-up pb-20">
@@ -1111,15 +1196,38 @@ function CreateInvoice({ onCancel, onSuccess }) {
                                     />
                                 </div>
                             )}
-                            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                <span className="text-slate-500 text-sm font-bold">GST (18%)</span>
-                                <input
-                                    readOnly
-                                    tabIndex="-1"
-                                    className="w-32 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
-                                    value={`+ ₹ ${tax.toFixed(1)}`}
-                                />
-                            </div>
+                            {isIntrastate ? (
+                                <>
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                                        <span className="text-slate-500 text-sm font-bold">CGST (9%)</span>
+                                        <input
+                                            readOnly
+                                            tabIndex="-1"
+                                            className="w-32 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                            value={`+ ₹ ${cgst.toFixed(1)}`}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                                        <span className="text-slate-500 text-sm font-bold">SGST (9%)</span>
+                                        <input
+                                            readOnly
+                                            tabIndex="-1"
+                                            className="w-32 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                            value={`+ ₹ ${sgst.toFixed(1)}`}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                                    <span className="text-slate-500 text-sm font-bold">IGST (18%)</span>
+                                    <input
+                                        readOnly
+                                        tabIndex="-1"
+                                        className="w-32 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                        value={`+ ₹ ${igst.toFixed(1)}`}
+                                    />
+                                </div>
+                            )}
                             <div className="pt-4 flex flex-col gap-2">
                                 <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest text-center">Grand Total</span>
                                 <div className="text-5xl font-black text-center text-slate-900 dark:text-white tracking-tighter whitespace-nowrap bg-slate-50 dark:bg-slate-800 py-4 rounded-3xl border border-slate-100 dark:border-slate-700 cursor-not-allowed">
@@ -1246,10 +1354,28 @@ function InvoiceViewModal({ invoice, onClose }) {
                                     <span>₹ {Number(invoice.transport.amount).toFixed(1)}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between text-slate-600">
-                                <span>GST (18%)</span>
-                                <span>₹ {Number(invoice.taxAmount).toFixed(1)}</span>
-                            </div>
+                            {invoice.taxType === 'CGST_SGST' ? (
+                                <>
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>CGST (9%)</span>
+                                        <span>₹ {Number(invoice.cgst || 0).toFixed(1)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>SGST (9%)</span>
+                                        <span>₹ {Number(invoice.sgst || 0).toFixed(1)}</span>
+                                    </div>
+                                </>
+                            ) : invoice.taxType === 'IGST' ? (
+                                <div className="flex justify-between text-slate-600">
+                                    <span>IGST (18%)</span>
+                                    <span>₹ {Number(invoice.igst || 0).toFixed(1)}</span>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between text-slate-600">
+                                    <span>GST (18%)</span>
+                                    <span>₹ {Number(invoice.taxAmount || 0).toFixed(1)}</span>
+                                </div>
+                            )}
                             <div className="pt-3 border-t border-slate-200 flex justify-between font-bold text-xl text-slate-900">
                                 <span>Total</span>
                                 <span>₹ {Number(invoice.totalAmount).toFixed(1)}</span>
