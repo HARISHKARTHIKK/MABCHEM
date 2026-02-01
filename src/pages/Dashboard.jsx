@@ -232,7 +232,7 @@ export default function Dashboard() {
             {/* Header Actions */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Dashboard</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Dashboard</h2>
                 </div>
                 <div className="flex w-full sm:w-auto gap-2">
                     {userRole !== 'viewer' && (
@@ -350,14 +350,14 @@ export default function Dashboard() {
                         <div className="space-y-1 mb-2">
                             {['CHENNAI', 'MUNDRA'].map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 px-2 py-0.5 rounded">
-                                    <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-slate-700 dark:text-slate-200">{(monthlySummary[loc]?.opening || 0).toLocaleString()}</span>
                                 </div>
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
-                            <span className="text-[10px] font-bold text-slate-500">{(monthlySummary.CHENNAI.opening + monthlySummary.MUNDRA.opening).toLocaleString()}</span>
-                            <span className="text-[8px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
+                            <span className="text-[14px] font-bold text-slate-500">{(monthlySummary.CHENNAI.opening + monthlySummary.MUNDRA.opening).toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
 
@@ -370,14 +370,14 @@ export default function Dashboard() {
                         <div className="space-y-1 mb-2">
                             {['CHENNAI', 'MUNDRA'].map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-900/10 px-2 py-0.5 rounded">
-                                    <span className="text-[8px] font-extrabold text-emerald-400 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">+{(monthlySummary[loc]?.inward || 0).toLocaleString()}</span>
                                 </div>
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
-                            <span className="text-[10px] font-bold text-emerald-600">{(monthlySummary.CHENNAI.inward + monthlySummary.MUNDRA.inward).toLocaleString()}</span>
-                            <span className="text-[8px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
+                            <span className="text-[14px] font-bold text-emerald-600">{(monthlySummary.CHENNAI.inward + monthlySummary.MUNDRA.inward).toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
 
@@ -390,14 +390,14 @@ export default function Dashboard() {
                         <div className="space-y-1 mb-2">
                             {['CHENNAI', 'MUNDRA'].map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-rose-50/30 dark:bg-rose-900/10 px-2 py-0.5 rounded">
-                                    <span className="text-[8px] font-extrabold text-rose-400 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-rose-600 dark:text-rose-400">-{(monthlySummary[loc]?.dispatch || 0).toLocaleString()}</span>
                                 </div>
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
-                            <span className="text-[10px] font-bold text-rose-600">{(monthlySummary.CHENNAI.dispatch + monthlySummary.MUNDRA.dispatch).toLocaleString()}</span>
-                            <span className="text-[8px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
+                            <span className="text-[14px] font-bold text-rose-600">{(monthlySummary.CHENNAI.dispatch + monthlySummary.MUNDRA.dispatch).toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
 
@@ -410,14 +410,14 @@ export default function Dashboard() {
                         <div className="space-y-1 mb-2">
                             {['CHENNAI', 'MUNDRA'].map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
-                                    <span className="text-[8px] font-extrabold text-blue-500 uppercase tracking-tighter">{loc}</span>
+                                    <span className="text-[10px] font-extrabold text-blue-500 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-blue-700 dark:text-blue-300">{(monthlySummary[loc]?.net || 0).toLocaleString()}</span>
                                 </div>
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-blue-200 dark:border-blue-800 pt-1">
-                            <span className="text-[10px] font-bold text-blue-700">{(monthlySummary.CHENNAI.net + monthlySummary.MUNDRA.net).toLocaleString()}</span>
-                            <span className="text-[8px] text-blue-400 font-medium uppercase tracking-tighter">Total</span>
+                            <span className="text-[14px] font-bold text-blue-700">{(monthlySummary.CHENNAI.net + monthlySummary.MUNDRA.net).toLocaleString()}</span>
+                            <span className="text-[10px] text-blue-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
                 </div>
