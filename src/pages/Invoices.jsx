@@ -1213,81 +1213,81 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                 </div>
 
                 <div className="lg:col-span-1 space-y-4 lg:sticky lg:top-6">
-                    <div className="bg-white p-6 rounded-[2rem] shadow-lg border border-slate-200 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
-                            <FileText className="h-24 w-24 rotate-12 text-slate-900" />
+                    <div className="bg-white p-5 rounded-[1.5rem] shadow-lg border border-slate-200 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-5 opacity-[0.03] pointer-events-none">
+                            <FileText className="h-16 w-16 rotate-12 text-slate-900" />
                         </div>
-                        <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em] mb-8">Billing Summary</h4>
-                        <div className="space-y-6 relative z-10">
-                            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                <span className="text-slate-500 text-sm font-bold">Subtotal</span>
+                        <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Billing Summary</h4>
+                        <div className="space-y-3 relative z-10">
+                            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                                <span className="text-slate-500 text-xs font-bold">Subtotal</span>
                                 <input
                                     readOnly
                                     tabIndex="-1"
-                                    className="w-32 bg-slate-50 dark:bg-slate-800 border-none text-right text-lg font-bold text-slate-800 dark:text-slate-200 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                    className="w-28 bg-slate-50 dark:bg-slate-800 border-none text-right text-base font-bold text-slate-800 dark:text-slate-200 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
                                     value={`₹ ${linesTotal.toFixed(1)}`}
                                 />
                             </div>
                             {transport.isExtra && (
-                                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                    <span className="text-slate-500 text-sm font-bold">Transport</span>
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                                    <span className="text-slate-500 text-xs font-bold">Transport</span>
                                     <input
                                         readOnly
                                         tabIndex="-1"
-                                        className="w-32 bg-blue-50 dark:bg-blue-900/30 border-none text-right text-lg font-bold text-blue-600 dark:text-blue-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                        className="w-28 bg-blue-50 dark:bg-blue-900/30 border-none text-right text-base font-bold text-blue-600 dark:text-blue-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
                                         value={`+ ₹ ${Number(transport.amount).toFixed(1)}`}
                                     />
                                 </div>
                             )}
                             {isIntrastate ? (
                                 <>
-                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                        <span className="text-slate-500 text-sm font-bold">CGST (9%)</span>
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                                        <span className="text-slate-500 text-xs font-bold">CGST (9%)</span>
                                         <input
                                             readOnly
                                             tabIndex="-1"
-                                            className="w-32 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                            className="w-28 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-base font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
                                             value={`+ ₹ ${cgst.toFixed(1)}`}
                                         />
                                     </div>
-                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                        <span className="text-slate-500 text-sm font-bold">SGST (9%)</span>
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                                        <span className="text-slate-500 text-xs font-bold">SGST (9%)</span>
                                         <input
                                             readOnly
                                             tabIndex="-1"
-                                            className="w-32 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                            className="w-28 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-base font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
                                             value={`+ ₹ ${sgst.toFixed(1)}`}
                                         />
                                     </div>
                                 </>
                             ) : (
-                                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                    <span className="text-slate-500 text-sm font-bold">IGST (18%)</span>
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                                    <span className="text-slate-500 text-xs font-bold">IGST (18%)</span>
                                     <input
                                         readOnly
                                         tabIndex="-1"
-                                        className="w-32 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-1"
+                                        className="w-28 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-base font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
                                         value={`+ ₹ ${igst.toFixed(1)}`}
                                     />
                                 </div>
                             )}
-                            <div className="pt-4 flex flex-col gap-2">
-                                <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest text-center">Grand Total</span>
-                                <div className="text-5xl font-black text-center text-slate-900 dark:text-white tracking-tighter whitespace-nowrap bg-slate-50 dark:bg-slate-800 py-4 rounded-3xl border border-slate-100 dark:border-slate-700 cursor-not-allowed">
-                                    <span className="text-blue-600 dark:text-blue-400 text-2xl mr-1">₹</span>
+                            <div className="pt-2 flex flex-col gap-1">
+                                <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest text-center">Grand Total</span>
+                                <div className="text-3xl font-black text-center text-slate-900 dark:text-white tracking-tighter whitespace-nowrap bg-slate-50 dark:bg-slate-800 py-3 rounded-2xl border border-slate-100 dark:border-slate-700 cursor-not-allowed">
+                                    <span className="text-blue-600 dark:text-blue-400 text-xl mr-1">₹</span>
                                     {total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                    <span className="text-slate-300 dark:text-slate-500 text-xl font-light">.{total.toFixed(1).split('.')[1]}</span>
+                                    <span className="text-slate-300 dark:text-slate-500 text-lg font-light">.{total.toFixed(1).split('.')[1]}</span>
                                 </div>
                             </div>
                             <button
                                 onClick={handleSubmit}
                                 disabled={submitting}
-                                className={`w-full mt-10 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-100 active:scale-[0.98] transition-all flex justify-center items-center gap-3 ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                className={`w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black text-base shadow-xl shadow-blue-100 active:scale-[0.98] transition-all flex justify-center items-center gap-2 ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                             >
-                                {submitting ? <Loader2 className="h-6 w-6 animate-spin" /> : <CheckCircle className="h-6 w-6" />}
+                                {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
                                 {submitting ? 'PROCESSING...' : 'FINAL DISPATCH'}
                             </button>
-                            <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-widest mt-4">Safe & Secure Entry</p>
+                            <p className="text-[9px] text-slate-400 text-center font-bold uppercase tracking-widest mt-2">Safe & Secure Entry</p>
                         </div>
                     </div>
                     {!fromLocation && (
