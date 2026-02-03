@@ -282,28 +282,35 @@ function StockDashboard({ summary, imports, localPurchases, products }) {
                                         <td colSpan="6" className="px-6 py-6 border-b border-slate-200">
                                             <div className="space-y-6">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    {Object.entries(item.locationDetails).map(([locName, data]) => (
-                                                        <div key={locName} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-shadow">
-                                                            <div className="flex items-center gap-2 mb-3 border-b border-slate-50 pb-2">
-                                                                <Building2 className="h-4 w-4 text-blue-600" />
-                                                                <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{locName}</span>
+                                                    {Object.entries(item.locationDetails)
+                                                        .sort(([a], [b]) => {
+                                                            const order = { 'CHENNAI': 1, 'MUNDRA': 2 };
+                                                            const valA = order[a.toUpperCase()] || 99;
+                                                            const valB = order[b.toUpperCase()] || 99;
+                                                            return valA - valB || a.localeCompare(b);
+                                                        })
+                                                        .map(([locName, data]) => (
+                                                            <div key={locName} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+                                                                <div className="flex items-center gap-2 mb-3 border-b border-slate-50 pb-2">
+                                                                    <Building2 className="h-4 w-4 text-blue-600" />
+                                                                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{locName}</span>
+                                                                </div>
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[9px] font-black text-slate-400 uppercase">Input</span>
+                                                                        <span className="text-sm font-bold text-emerald-600">+{data.in}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col border-x border-slate-100 px-2 text-center">
+                                                                        <span className="text-[9px] font-black text-slate-400 uppercase">Output</span>
+                                                                        <span className="text-sm font-bold text-rose-500">-{data.out}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col text-right">
+                                                                        <span className="text-[9px] font-black text-slate-400 uppercase">Stock</span>
+                                                                        <span className="text-sm font-black text-slate-900">{data.balance}</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[9px] font-black text-slate-400 uppercase">Input</span>
-                                                                    <span className="text-sm font-bold text-emerald-600">+{data.in}</span>
-                                                                </div>
-                                                                <div className="flex flex-col border-x border-slate-100 px-2 text-center">
-                                                                    <span className="text-[9px] font-black text-slate-400 uppercase">Output</span>
-                                                                    <span className="text-sm font-bold text-rose-500">-{data.out}</span>
-                                                                </div>
-                                                                <div className="flex flex-col text-right">
-                                                                    <span className="text-[9px] font-black text-slate-400 uppercase">Stock</span>
-                                                                    <span className="text-sm font-black text-slate-900">{data.balance}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
                                                 </div>
 
                                                 {/* Inward History for this Product */}

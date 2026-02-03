@@ -196,6 +196,62 @@ export default function Dashboard() {
         };
     }, [products, allImports, allPurchases, allDispatches, stockSnapshots, selectedMonth]);
 
+    const productStats = useMemo(() => {
+        const now = new Date();
+        const startOfSelected = startOfMonth(selectedMonth);
+        const endOfSelected = endOfMonth(selectedMonth);
+        const isCurrentMonth = format(selectedMonth, 'yyyy-MM') === format(now, 'yyyy-MM');
+
+        const getQty = (item) => Number(item.quantity) || 0;
+        const parseDate = (item) => {
+            if (item.createdAt?.seconds) return new Date(item.createdAt.seconds * 1000);
+            if (item.date) {
+                const d = new Date(item.date);
+                if (!isNaN(d.getTime())) return d;
+            }
+            return new Date(0);
+        };
+
+        const stats = {};
+        products.forEach(p => {
+            stats[p.id] = {};
+            ['CHENNAI', 'MUNDRA'].forEach(loc => {
+                const currentStock = Number(p.locations?.[loc]) || 0;
+                const prodLogs = [...allImports, ...allPurchases, ...allDispatches]
+                    .filter(l => l.productId === p.id && l.location === loc)
+                    .map(item => ({
+                        ...item,
+                        _date: parseDate(item),
+                        _isInward: !item.invoiceNo || (item.type === 'IMPORT' || item.type === 'LOCAL')
+                    }));
+
+                const inward = prodLogs
+                    .filter(l => l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
+                    .reduce((sum, l) => sum + getQty(l), 0);
+                const dispatch = prodLogs
+                    .filter(l => !l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
+                    .reduce((sum, l) => sum + getQty(l), 0);
+
+                let netAtEndOfSelected = currentStock;
+                if (!isCurrentMonth && startOfSelected < startOfMonth(now)) {
+                    const logsAfterSelected = prodLogs.filter(l => l._date > endOfSelected);
+                    const netChangeSinceSelected = logsAfterSelected.reduce((sum, l) => {
+                        return sum + (l._isInward ? getQty(l) : -getQty(l));
+                    }, 0);
+                    netAtEndOfSelected = currentStock - netChangeSinceSelected;
+                }
+                const opening = netAtEndOfSelected - (inward - dispatch);
+                stats[p.id][loc] = {
+                    current: currentStock,
+                    opening: opening,
+                    dispatch: dispatch,
+                    total: currentStock + dispatch
+                };
+            });
+        });
+        return stats;
+    }, [products, allImports, allPurchases, allDispatches, selectedMonth]);
+
     const handleOpenStockModal = (product) => {
         setSelectedProduct(product);
         setStockForm({ location: '', quantity: '', reason: 'Dashboard Update' });
@@ -276,15 +332,37 @@ export default function Dashboard() {
 
                                     {/* Dashboard: Location Specific Prominent Stock info */}
                                     <div className="mb-2 space-y-1">
-                                        {hasLocations && Object.entries(p.locations).map(([loc, qty]) => (
-                                            <div key={loc} className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 px-2 py-1 rounded-lg">
-                                                <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">{loc}</span>
-                                                <div className="text-right">
-                                                    <span className="text-lg font-black text-slate-800 dark:text-slate-100 leading-none">{(Number(qty) || 0).toFixed(1)}</span>
-                                                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 ml-1 uppercase">mts</span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                        {hasLocations && Object.entries(p.locations)
+                                            .sort(([a], [b]) => {
+                                                const order = { 'CHENNAI': 1, 'MUNDRA': 2 };
+                                                const valA = order[a.toUpperCase()] || 99;
+                                                const valB = order[b.toUpperCase()] || 99;
+                                                return valA - valB || a.localeCompare(b);
+                                            })
+                                            .map(([loc, qty]) => {
+                                                const st = productStats[p.id]?.[loc] || { current: qty, opening: 0, dispatch: 0, total: 0 };
+                                                return (
+                                                    <div key={loc} className="bg-slate-50/50 dark:bg-slate-900/50 px-2 py-1.5 rounded-lg border border-slate-100/50 dark:border-slate-800/50">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">{loc}</span>
+                                                            <div className="text-right">
+                                                                <span className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-none">{st.current.toFixed(1)}</span>
+                                                                <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 ml-1 uppercase">mts</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-1 border-t border-slate-100 dark:border-slate-800 pt-1 mt-1">
+                                                            <div className="text-center border-r border-slate-100 dark:border-slate-800">
+                                                                <div className="text-[7px] font-black text-slate-400 uppercase leading-none mb-0.5">OPENING</div>
+                                                                <div className="text-xs font-black text-slate-700 dark:text-slate-300">{(st.opening || 0).toFixed(1)}</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-[7px] font-black text-slate-400 uppercase leading-none mb-0.5">DISP</div>
+                                                                <div className="text-xs font-black text-rose-500">{(st.dispatch || 0).toFixed(1)}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                     </div>
                                     <div className="border-t border-slate-50 dark:border-slate-700/50 mb-1" />
                                     <div className="mb-1">

@@ -321,7 +321,12 @@ export default function Inventory() {
                                                 <td className="px-6 py-4 align-top">
                                                     <div className="space-y-1.5">
                                                         {Object.keys(p.locations || {}).length > 0 ? (
-                                                            Object.entries(p.locations || {}).map(([loc, qty]) => (
+                                                            Object.entries(p.locations || {}).sort(([a], [b]) => {
+                                                                const order = { 'CHENNAI': 1, 'MUNDRA': 2 };
+                                                                const valA = order[a.toUpperCase()] || 99;
+                                                                const valB = order[b.toUpperCase()] || 99;
+                                                                return valA - valB || a.localeCompare(b);
+                                                            }).map(([loc, qty]) => (
                                                                 <div key={loc} className="flex justify-between items-center text-xs bg-slate-50 p-1.5 rounded border border-slate-100 max-w-xs">
                                                                     <span className="font-medium text-slate-600 flex items-center gap-1"><MapPin className="h-3 w-3" /> {loc}</span>
                                                                     <span className="font-bold text-slate-800">{(Number(qty) || 0).toFixed(1)} mts</span>
@@ -373,7 +378,12 @@ export default function Inventory() {
                                         <div className="bg-slate-50 rounded-lg p-3 space-y-2 border border-slate-100">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Location Breakdown</div>
                                             {Object.keys(p.locations || {}).length > 0 ? (
-                                                Object.entries(p.locations || {}).map(([loc, qty]) => (
+                                                Object.entries(p.locations || {}).sort(([a], [b]) => {
+                                                    const order = { 'CHENNAI': 1, 'MUNDRA': 2 };
+                                                    const valA = order[a.toUpperCase()] || 99;
+                                                    const valB = order[b.toUpperCase()] || 99;
+                                                    return valA - valB || a.localeCompare(b);
+                                                }).map(([loc, qty]) => (
                                                     <div key={loc} className="flex justify-between items-center text-xs">
                                                         <span className="text-slate-600 flex items-center gap-1"><MapPin className="h-3 w-3" /> {loc}</span>
                                                         <span className="font-bold text-slate-800">{(Number(qty) || 0).toFixed(1)} mts</span>
@@ -400,7 +410,12 @@ export default function Inventory() {
 
                 {view === 'summary' && (
                     <div className="p-6 space-y-8">
-                        {Object.keys(locationSummary).length > 0 ? Object.entries(locationSummary).map(([location, data]) => (
+                        {Object.keys(locationSummary).length > 0 ? Object.entries(locationSummary).sort(([a], [b]) => {
+                            const order = { 'CHENNAI': 1, 'MUNDRA': 2 };
+                            const valA = order[a.toUpperCase()] || 99;
+                            const valB = order[b.toUpperCase()] || 99;
+                            return valA - valB || a.localeCompare(b);
+                        }).map(([location, data]) => (
                             <div key={location} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                 <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
                                     <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><MapPin className="h-5 w-5 text-blue-600" /> {location}</h3>
