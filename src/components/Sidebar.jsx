@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, ClipboardList, FileText, Users, BarChart3, Settings, Truck, LogOut, X, TrendingUp, CreditCard, Box, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Package, ClipboardList, FileText, Users, BarChart3, Settings, Truck, LogOut, X, TrendingUp, CreditCard, Box, Sun, Moon, Trash2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';

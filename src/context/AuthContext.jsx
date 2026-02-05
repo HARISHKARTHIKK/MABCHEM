@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -22,58 +22,47 @@ export function AuthProvider({ children }) {
             return;
         }
 
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (user) {
-                // 🚀 OPTIMIZATION: Set user immediately so UI doesn't hang
                 setCurrentUser(user);
-                setLoading(false);
 
-                // Fetch user role from Firestore in background
-                try {
-                    const fetchRole = async () => {
-                        const docRef = doc(db, "users", user.uid);
-                        const docSnap = await getDoc(docRef);
-
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            if (data.active === false) return 'suspended';
-                            return data;
+                // Real-time listener for user data (role, status, etc.)
+                const userDocRef = doc(db, "users", user.uid);
+                const unsubUserDoc = onSnapshot(userDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        if (data.active === false) {
+                            setUserRole('suspended');
+                            setUserData({ role: 'suspended', active: false });
                         } else {
-                            // Create default user doc
-                            await setDoc(docRef, {
-                                email: user.email,
-                                role: 'viewer',
-                                active: true,
-                                createdAt: serverTimestamp(),
-                                locations: [] // Optional
-                            });
-                            return 'viewer';
+                            setUserRole(data.role || 'viewer');
+                            setUserData(data);
                         }
-                    };
-
-                    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 4000));
-
-                    // We still use the race for the ROLE, but we don't block the USER login
-                    const data = await fetchRole();
-                    if (data === 'timeout') {
-                        console.warn("User data fetch timed out, defaulting to 'viewer'");
+                    } else {
+                        // Create default user doc if it doesn't exist
+                        setDoc(userDocRef, {
+                            email: user.email,
+                            role: 'viewer',
+                            active: true,
+                            createdAt: serverTimestamp(),
+                            locations: []
+                        });
                         setUserRole('viewer');
                         setUserData({ role: 'viewer' });
-                    } else if (data === 'suspended') {
-                        setUserRole('suspended');
-                        setUserData({ role: 'suspended', active: false });
-                    } else {
-                        setUserRole(data.role || 'viewer');
-                        setUserData(data);
                     }
-                } catch (error) {
-                    console.error("Error fetching user data:", error);
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Error fetching user data snapshot:", error);
                     setUserRole('viewer');
                     setUserData({ role: 'viewer' });
-                }
+                    setLoading(false);
+                });
+
+                return () => unsubUserDoc();
             } else {
                 setCurrentUser(null);
                 setUserRole(null);
+                setUserData(null);
                 setLoading(false);
             }
         });

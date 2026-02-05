@@ -512,114 +512,151 @@ export default function Dashboard() {
                         View All Log <ArrowRight className="h-3 w-3" />
                     </button>
                 </div>
+
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                     {/* Desktop Table */}
                     <div className="hidden sm:block overflow-x-auto">
                         <table className="w-full text-left text-sm text-slate-600">
                             <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[11px] tracking-wider">
                                 <tr>
-                                    <th className="px-3 py-2">Date</th>
                                     <th className="px-3 py-2">Invoice</th>
                                     <th className="px-3 py-2">Customer</th>
                                     <th className="px-3 py-2">Product</th>
                                     <th className="px-3 py-2">No. of Bags</th>
                                     <th className="px-3 py-2 text-right">Qty</th>
-                                    <th className="px-3 py-2 text-right">Rate per MTS</th>
+                                    <th className="px-3 py-2 text-right">Rate</th>
                                     <th className="px-3 py-2 text-right">Basic</th>
-                                    <th className="px-3 py-2 text-right">Tax (GST)</th>
+                                    <th className="px-3 py-2 text-right">Tax</th>
                                     <th className="px-3 py-2 text-right">Amount</th>
                                     <th className="px-3 py-2">Vehicle</th>
                                     <th className="px-3 py-2">Remarks</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {dispatches.map(d => (
-                                    <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                        <td className="px-3 py-2 text-slate-500 dark:text-slate-400 whitespace-nowrap text-[14px]">
-                                            {d.createdAt?.seconds ? format(new Date(d.createdAt.seconds * 1000), 'dd MMM') : '-'}
-                                        </td>
-                                        <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 text-[14px]">{d.invoiceNo}</td>
-                                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100 font-bold truncate max-w-[150px] text-[14px]" title={d.customerName}>
-                                            {d.customerName || '-'}
-                                        </td>
-                                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100 text-[14px] leading-tight truncate max-w-[120px]">{d.productName || 'Unknown'}</td>
-                                        <td className="px-3 py-2 text-[14px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                            {d.bags ? `${d.bags} x ${d.bagWeight}kg` : '-'}
-                                        </td>
+                            {(() => {
+                                const groups = [];
+                                dispatches.forEach((d) => {
+                                    const date = d.createdAt?.seconds ? format(new Date(d.createdAt.seconds * 1000), 'dd MMM yyyy') : 'Unknown Date';
+                                    if (groups.length === 0 || groups[groups.length - 1].date !== date) {
+                                        groups.push({ date, items: [d] });
+                                    } else {
+                                        groups[groups.length - 1].items.push(d);
+                                    }
+                                });
 
-                                        <td className="px-3 py-2 text-right text-slate-800 dark:text-slate-200 text-[14px]">
-                                            {(Number(d.quantity) || 0).toFixed(1)} <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">mts</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
-                                            ₹{(Number(d.unitPrice) || 0).toLocaleString('en-IN')}
-                                        </td>
-                                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
-                                            ₹{((Number(d.quantity) || 0) * (Number(d.unitPrice) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                        </td>
-                                        <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400 text-[14px] text-nowrap">
-                                            ₹{(Number(d.taxAmount) || 0).toFixed(0)}
-                                        </td>
-                                        <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100 text-[14px] text-nowrap">
-                                            ₹{(Number(d.itemTotal) || 0).toFixed(0)}
-                                        </td>
-                                        <td className="px-3 py-2 text-[14px] text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                                            {d.transport?.vehicleNumber || '-'}
-                                        </td>
-                                        <td className="px-3 py-2 text-[14px] text-slate-800 dark:text-slate-200 truncate max-w-[100px]" title={d.remarks}>
-                                            {d.remarks || '-'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
+                                return groups.map((group, gIdx) => (
+                                    <tbody key={group.date} className={gIdx > 0 ? 'border-t-4 border-slate-200 dark:border-slate-700' : ''}>
+                                        <tr className="bg-slate-50 dark:bg-slate-900/50">
+                                            <td colSpan={11} className="px-3 py-2 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] border-y border-slate-200 dark:border-slate-800">
+                                                📅 {group.date}
+                                            </td>
+                                        </tr>
+                                        {group.items.map((d) => (
+                                            <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                                <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 text-[14px]">{d.invoiceNo}</td>
+                                                <td className="px-3 py-2 text-slate-900 dark:text-slate-100 font-bold truncate max-w-[150px] text-[14px]" title={d.customerName}>
+                                                    {d.customerName || '-'}
+                                                </td>
+                                                <td className="px-3 py-2 text-slate-900 dark:text-slate-100 text-[14px] leading-tight truncate max-w-[120px]">{d.productName || 'Unknown'}</td>
+                                                <td className="px-3 py-2 text-[14px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                    {d.bags ? `${d.bags} x ${d.bagWeight}kg` : '-'}
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-slate-800 dark:text-slate-200 text-[14px]">
+                                                    {(Number(d.quantity) || 0).toFixed(1)} <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">mts</span>
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
+                                                    ₹{(Number(d.unitPrice) || 0).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
+                                                    ₹{((Number(d.quantity) || 0) * (Number(d.unitPrice) || 0)).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400 text-[14px] text-nowrap">
+                                                    ₹{(Number(d.taxAmount) || 0).toFixed(0)}
+                                                </td>
+                                                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100 text-[14px] text-nowrap">
+                                                    ₹{(Number(d.itemTotal) || 0).toFixed(0)}
+                                                </td>
+                                                <td className="px-3 py-2 text-[14px] text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                                    {d.transport?.vehicleNumber || '-'}
+                                                </td>
+                                                <td className="px-3 py-2 text-[14px] text-slate-800 dark:text-slate-200 truncate max-w-[100px]" title={d.remarks}>
+                                                    {d.remarks || '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                ));
+                            })()}
                         </table>
                     </div>
 
-                    {/* Mobile Cards */}
-                    <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-700">
-                        {dispatches.map(d => (
-                            <div key={d.id} className="p-3 bg-white dark:bg-slate-800 flex flex-col gap-1.5">
-                                <div className="flex justify-between items-start">
-                                    <div className="space-y-0.5">
-                                        <div className="font-mono text-slate-900 dark:text-slate-400 text-[10px]">{d.invoiceNo}</div>
-                                        <div className="text-sm text-slate-900 dark:text-slate-100 font-black uppercase tracking-tight leading-none">{d.customerName || 'No Customer'}</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-sm text-blue-600 dark:text-blue-400">₹{(Number(d.itemTotal) || 0).toFixed(0)}</div>
-                                        <div className="text-[8px] text-slate-500 dark:text-slate-500 uppercase mt-0.5">Basic: ₹{((Number(d.quantity) || 0) * (Number(d.unitPrice) || 0)).toFixed(0)}</div>
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded">
-                                    <div className="text-slate-900 dark:text-slate-200 text-[12px] truncate max-w-[150px]">{d.productName || 'Unknown'}</div>
-                                    <div className="text-[9px] text-blue-600 dark:text-blue-400">
-                                        {d.bags ? `${d.bags} x ${d.bagWeight}kg` : '-'}
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-end border-t border-slate-50 dark:border-slate-800 pt-1.5">
-                                    <div className="space-y-1">
-                                        <div className="text-[11px] text-blue-700 dark:text-blue-400 flex items-center gap-1">
-                                            <Truck className="h-3 w-3" /> {d.transport?.vehicleNumber || 'NO VEHICLE'}
-                                        </div>
-                                        <span className="flex items-center gap-1 text-[9px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded uppercase w-fit">
-                                            <MapPin className="h-2 w-2" /> {d.location}
-                                        </span>
-                                    </div>
-                                    <div className="text-right space-y-0.5">
-                                        <div className="text-[10px] text-slate-900 dark:text-slate-300">
-                                            {(Number(d.quantity) || 0).toFixed(1)} mts
-                                        </div>
-                                        {d.remarks && <div className="text-[11px] text-slate-700 dark:text-slate-300 italic mt-0.5 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-900/30 max-w-[180px]">Note: {d.remarks}</div>}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    {/* Mobile View */}
+                    <div className="sm:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-700">
+                        {(() => {
+                            const groups = [];
+                            dispatches.forEach((d) => {
+                                const date = d.createdAt?.seconds ? format(new Date(d.createdAt.seconds * 1000), 'dd MMM yyyy') : 'Unknown Date';
+                                if (groups.length === 0 || groups[groups.length - 1].date !== date) {
+                                    groups.push({ date, items: [d] });
+                                } else {
+                                    groups[groups.length - 1].items.push(d);
+                                }
+                            });
 
-                    {dispatches.length === 0 && (
-                        <div className="px-6 py-12 text-center text-slate-400 bg-white">
-                            No recent dispatches today.
-                        </div>
-                    )}
+                            return groups.map((group, gIdx) => (
+                                <div key={group.date} className={gIdx > 0 ? 'mt-4 border-t-4 border-slate-200 dark:border-slate-800' : ''}>
+                                    <div className="px-4 py-2 bg-slate-100 dark:bg-slate-900 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                                        <Calendar className="h-3 w-3" /> {group.date}
+                                    </div>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                                        {group.items.map((d) => (
+                                            <div key={d.id} className="p-4 bg-white dark:bg-slate-800 flex flex-col gap-2">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-mono text-slate-400 text-[10px]">{d.invoiceNo}</span>
+                                                        </div>
+                                                        <div className="text-sm text-slate-900 dark:text-slate-100 font-black uppercase tracking-tight">{d.customerName || 'No Customer'}</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-sm font-black text-blue-600 dark:text-blue-400">₹{(Number(d.itemTotal) || 0).toLocaleString('en-IN')}</div>
+                                                        <div className="text-[9px] text-slate-400 uppercase">Qty: {(Number(d.quantity) || 0).toFixed(1)} mts</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 px-2 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                                                    <div className="text-slate-700 dark:text-slate-300 text-xs font-bold truncate max-w-[200px]">{d.productName || 'Unknown'}</div>
+                                                    <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                                                        {d.bags ? `${d.bags} bags` : '-'}
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-between items-end pt-1">
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1">
+                                                            <Truck className="h-3 w-3" /> {d.transport?.vehicleNumber || 'NO VEHICLE'}
+                                                        </div>
+                                                        <span className="text-[9px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded-full w-fit uppercase font-bold tracking-tighter border border-slate-200 dark:border-slate-800">
+                                                            {d.location}
+                                                        </span>
+                                                    </div>
+                                                    {d.remarks && (
+                                                        <div className="text-[10px] text-slate-600 dark:text-slate-400 italic bg-amber-50 dark:bg-amber-900/10 px-2 py-1 rounded border border-amber-100/50 dark:border-amber-900/20 max-w-[180px]">
+                                                            {d.remarks}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
                 </div>
+
+                {dispatches.length === 0 && (
+                    <div className="px-6 py-12 text-center text-slate-400 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mt-4">
+                        No recent dispatches found.
+                    </div>
+                )}
             </section>
 
             {/* Inward Stock Summary */}
@@ -713,7 +750,7 @@ export default function Dashboard() {
                     </div>
 
                     {recentInwards.length === 0 && (
-                        <div className="px-6 py-12 text-center text-slate-400 bg-white">
+                        <div className="px-6 py-12 text-center text-slate-400 bg-white dark:bg-slate-800">
                             No inward entries yet.
                         </div>
                     )}

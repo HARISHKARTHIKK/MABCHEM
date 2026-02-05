@@ -3,7 +3,7 @@ import { useSettings } from '../context/SettingsContext';
 import { Save, Building2, FileText, Package, Truck, Shield, Calendar, Wrench, Plus, Trash2, Loader2, AlertCircle, Key, RefreshCw, Clock, History, AlertTriangle } from 'lucide-react';
 import { backfillDispatches, updateStockLevel } from '../services/firestoreService';
 import { db } from '../lib/firebase';
-import { collection, getDocs, updateDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Users } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -29,9 +29,6 @@ export default function Settings() {
     const [showReconcileModal, setShowReconcileModal] = useState(false);
 
     useEffect(() => {
-        if (activeTab === 'users') {
-            fetchUsers();
-        }
         if (activeTab === 'compliance') {
             fetchProducts();
         }
@@ -46,17 +43,19 @@ export default function Settings() {
         }
     };
 
-    const fetchUsers = async () => {
-        setLoadingUsers(true);
-        try {
-            const snap = await getDocs(collection(db, 'users'));
-            setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (error) {
-            console.error("Error fetching users:", error);
-        } finally {
-            setLoadingUsers(false);
+    useEffect(() => {
+        if (activeTab === 'users') {
+            setLoadingUsers(true);
+            const unsub = onSnapshot(collection(db, 'users'), (snap) => {
+                setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                setLoadingUsers(false);
+            }, (err) => {
+                console.error("Error fetching users:", err);
+                setLoadingUsers(false);
+            });
+            return () => unsub();
         }
-    };
+    }, [activeTab]);
 
     const handleUserUpdate = async (userId, field, value) => {
         try {
