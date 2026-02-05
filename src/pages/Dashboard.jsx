@@ -524,6 +524,7 @@ export default function Dashboard() {
                                     <th className="px-3 py-2">Product</th>
                                     <th className="px-3 py-2">No. of Bags</th>
                                     <th className="px-3 py-2 text-right">Qty</th>
+                                    <th className="px-3 py-2 text-right">Rate per MTS</th>
                                     <th className="px-3 py-2 text-right">Basic</th>
                                     <th className="px-3 py-2 text-right">Tax (GST)</th>
                                     <th className="px-3 py-2 text-right">Amount</th>
@@ -550,6 +551,9 @@ export default function Dashboard() {
                                             {(Number(d.quantity) || 0).toFixed(1)} <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">mts</span>
                                         </td>
                                         <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
+                                            ₹{(Number(d.unitPrice) || 0).toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
                                             ₹{((Number(d.quantity) || 0) * (Number(d.unitPrice) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                         </td>
                                         <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400 text-[14px] text-nowrap">
@@ -561,7 +565,7 @@ export default function Dashboard() {
                                         <td className="px-3 py-2 text-[14px] text-blue-600 dark:text-blue-400 whitespace-nowrap">
                                             {d.transport?.vehicleNumber || '-'}
                                         </td>
-                                        <td className="px-3 py-2 text-[14px] text-slate-800 dark:text-slate-200 truncate max-w-[180px]" title={d.remarks}>
+                                        <td className="px-3 py-2 text-[14px] text-slate-800 dark:text-slate-200 truncate max-w-[100px]" title={d.remarks}>
                                             {d.remarks || '-'}
                                         </td>
                                     </tr>
