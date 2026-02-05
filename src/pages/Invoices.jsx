@@ -5,7 +5,7 @@ import { generateEInvoiceJSON, generateEwayBillJSON, downloadJSON } from '../uti
 import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn, Clock, Edit2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
-import { createInvoice, updateInvoice } from '../services/firestoreService';
+import { createInvoice, updateInvoice, deleteInvoice } from '../services/firestoreService';
 import { format } from 'date-fns';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
@@ -146,6 +146,19 @@ export default function Invoices() {
         navigator.clipboard.writeText(text);
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const handleDelete = async (e, inv) => {
+        e.stopPropagation();
+        if (window.confirm(`Are you sure you want to delete Invoice ${inv.invoiceNo}? This will revert stock and PO changes.`)) {
+            try {
+                await deleteInvoice(inv.id);
+                showToast(`Invoice ${inv.invoiceNo} deleted successfully.`);
+            } catch (error) {
+                console.error("Delete Error:", error);
+                alert("Failed to delete invoice: " + error.message);
+            }
+        }
     };
 
     if (view === 'create') {
@@ -321,13 +334,22 @@ export default function Invoices() {
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-1">
                                             {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
-                                                <button
-                                                    onClick={() => { setEditingInvoice(inv); setView('edit'); }}
-                                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-full transition-colors"
-                                                    title="Edit Invoice"
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </button>
+                                                <>
+                                                    <button
+                                                        onClick={() => { setEditingInvoice(inv); setView('edit'); }}
+                                                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-full transition-colors"
+                                                        title="Edit Invoice"
+                                                    >
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => handleDelete(e, inv)}
+                                                        className="p-2 text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
+                                                        title="Delete Invoice"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </>
                                             )}
                                             <button
                                                 onClick={() => setSelectedInvoice(inv)}
@@ -391,12 +413,20 @@ export default function Invoices() {
                                         <MapPin className="h-3 w-3 text-blue-500" /> {inv.fromLocation || '-'}
                                     </span>
                                     {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setView('edit'); }}
-                                            className="p-1.5 text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg transition-colors"
-                                        >
-                                            <Edit2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        <div className="flex gap-1">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setView('edit'); }}
+                                                className="p-1.5 text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg transition-colors"
+                                            >
+                                                <Edit2 className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDelete(e, inv)}
+                                                className="p-1.5 text-rose-600 bg-rose-50 dark:bg-rose-900/20 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             </div>

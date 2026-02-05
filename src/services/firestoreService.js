@@ -621,6 +621,89 @@ export const updateInvoice = async (invoiceId, updatedInvoice, updatedItems, fro
     });
 };
 
+export const deleteInvoice = async (invoiceId) => {
+    const auth = getAuth();
+    if (!auth.currentUser) throw new Error("User not authenticated");
+
+    // Fetch invoice data
+    const invoiceRef = doc(db, 'invoices', invoiceId);
+    const invoiceSnap = await getDoc(invoiceRef);
+    if (!invoiceSnap.exists()) throw new Error("Invoice not found.");
+    const invoiceData = invoiceSnap.data();
+    const fromLocation = invoiceData.fromLocation;
+
+    // Fetch items
+    const qItems = query(collection(db, "invoiceItems"), where("invoiceId", "==", invoiceId));
+    const itemsSnap = await getDocs(qItems);
+    const items = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Fetch related records to delete
+    const qMovements = query(collection(db, "stockMovements"), where("relatedInvoiceId", "==", invoiceId));
+    const moveSnaps = await getDocs(qMovements);
+
+    const qDispatches = query(collection(db, "dispatches"), where("invoiceId", "==", invoiceId));
+    const dispSnaps = await getDocs(qDispatches);
+
+    return await runTransaction(db, async (transaction) => {
+        // 1. COLLECT PRODUCT & PO IDs
+        const productIds = [...new Set(items.map(i => i.productId))];
+        const poIds = [...new Set(items.filter(i => i.purchaseOrderId).map(i => i.purchaseOrderId))];
+
+        // 2. READ ALL NECESSARY DOCUMENTS
+        const productSnaps = await Promise.all(productIds.map(id => transaction.get(doc(db, "products", id))));
+        const poSnaps = await Promise.all(poIds.map(id => transaction.get(doc(db, "purchaseOrders", id))));
+
+        const productMap = {};
+        productSnaps.forEach(snap => { if (snap.exists()) productMap[snap.id] = snap.data(); });
+
+        const poMap = {};
+        poSnaps.forEach(snap => { if (snap.exists()) poMap[snap.id] = snap.data(); });
+
+        // 3. REVERSE STOCK & PO CHANGES
+        for (const item of items) {
+            // Update Product Stock
+            const productData = productMap[item.productId];
+            if (productData) {
+                const locations = { ...productData.locations };
+                locations[fromLocation] = Number(((Number(locations[fromLocation]) || 0) + Number(item.quantity)).toFixed(1));
+                const newTotalStock = Object.values(locations).reduce((a, b) => a + (Number(b) || 0), 0);
+                transaction.update(doc(db, "products", item.productId), {
+                    locations,
+                    stockQty: Number(newTotalStock.toFixed(1)),
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            // Update PO
+            if (item.purchaseOrderId && poMap[item.purchaseOrderId]) {
+                const poData = poMap[item.purchaseOrderId];
+                const poItems = JSON.parse(JSON.stringify(poData.items));
+                const poItemIndex = poItems.findIndex(i => i.productId === item.productId);
+                if (poItemIndex !== -1) {
+                    poItems[poItemIndex].deliveredQty = Number((Number(poItems[poItemIndex].deliveredQty || 0) - Number(item.quantity)).toFixed(2));
+                    poItems[poItemIndex].remainingQty = Number((Number(poItems[poItemIndex].totalQty) - poItems[poItemIndex].deliveredQty).toFixed(2));
+                    if (poItems[poItemIndex].fulfillments) {
+                        poItems[poItemIndex].fulfillments = poItems[poItemIndex].fulfillments.filter(f => f.invoiceNo !== invoiceData.invoiceNo);
+                    }
+                }
+                transaction.update(doc(db, "purchaseOrders", item.purchaseOrderId), {
+                    items: poItems,
+                    status: poItems.every(i => Number(i.deliveredQty) === 0) ? 'Open' : 'Partially Fulfilled',
+                    updatedAt: serverTimestamp()
+                });
+            }
+        }
+
+        // 4. DELETE SUB-RECORDS
+        itemsSnap.forEach(d => transaction.delete(d.ref));
+        moveSnaps.forEach(d => transaction.delete(d.ref));
+        dispSnaps.forEach(d => transaction.delete(d.ref));
+
+        // 5. DELETE INVOICE
+        transaction.delete(invoiceRef);
+    });
+};
+
 /* =========================
    BACKFILL / MAINTENANCE
    ========================= */
