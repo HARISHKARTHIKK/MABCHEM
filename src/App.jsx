@@ -17,6 +17,7 @@ import Expenses from './pages/Expenses';
 import StockManagement from './pages/StockManagement';
 import Suppliers from './pages/Suppliers';
 import PurchaseOrders from './pages/PurchaseOrders';
+import RecycleBin from './pages/RecycleBin';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -135,6 +136,7 @@ export default function App() {
               <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
               <Route path="/stock-management" element={<ProtectedRoute><StockManagement /></ProtectedRoute>} />
               <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
+              <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute>} />
             </Routes>
           </Router>

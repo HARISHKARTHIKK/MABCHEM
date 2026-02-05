@@ -699,7 +699,22 @@ export const deleteInvoice = async (invoiceId) => {
         moveSnaps.forEach(d => transaction.delete(d.ref));
         dispSnaps.forEach(d => transaction.delete(d.ref));
 
-        // 5. DELETE INVOICE
+        // 5. MOVE TO RECYCLE BIN
+        const recycleRef = doc(collection(db, "recycleBin"));
+        transaction.set(recycleRef, {
+            originalId: invoiceId,
+            deletedAt: serverTimestamp(),
+            deletedBy: auth.currentUser.uid,
+            type: 'INVOICE',
+            data: {
+                ...invoiceData,
+                items: items,
+                movements: moveSnaps.docs.map(d => d.data()),
+                dispatches: dispSnaps.docs.map(d => d.data())
+            }
+        });
+
+        // 6. DELETE INVOICE
         transaction.delete(invoiceRef);
     });
 };

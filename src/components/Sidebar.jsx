@@ -19,6 +19,7 @@ const navigation = [
     { name: 'Logistics Reports', href: '/transporter-reports', icon: TrendingUp },
     { name: 'Expenses', href: '/expenses', icon: CreditCard },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'Recycle Bin', href: '/recycle-bin', icon: Trash2 },
     { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

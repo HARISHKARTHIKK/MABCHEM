@@ -258,7 +258,7 @@ export default function Invoices() {
                                 <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
                                     <td className="px-6 py-4 font-mono font-medium text-slate-700">{inv.invoiceNo}</td>
                                     <td className="px-6 py-4 text-slate-500">
-                                        {inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-'}
+                                        {inv.date ? format(new Date(inv.date), 'dd MMM yyyy') : (inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-')}
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-900">{inv.customerName}</div>
@@ -395,7 +395,7 @@ export default function Invoices() {
                                         )}
                                     </div>
                                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                        {inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-'}
+                                        {inv.date ? format(new Date(inv.date), 'dd MMM yyyy') : (inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-')}
                                     </p>
                                 </div>
                                 <div className="text-right">
@@ -492,6 +492,9 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
     const [remarks, setRemarks] = useState(invoice?.remarks || '');
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [submitting, setSubmitting] = useState(false);
+    const [invoiceDate, setInvoiceDate] = useState(
+        invoice?.date || (invoice?.createdAt?.seconds ? format(new Date(invoice.createdAt.seconds * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+    );
 
     // New Logistics State
     const [transporters, setTransporters] = useState([]);
@@ -775,7 +778,8 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                 distance: Number(distance) || 100,
                 destinationPincode: destinationPincode,
                 transportationCost: Number(transport.amount) || 0,
-                status: invoice?.status || 'paid'
+                status: invoice?.status || 'paid',
+                date: invoiceDate
             };
 
             if (invoice?.id) {
@@ -807,21 +811,30 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
     return (
         <div className="max-w-[1600px] mx-auto space-y-3 animate-fade-in-up pb-20">
             {/* Header / Navigation */}
-            <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-slate-200">
-                <div className="flex items-center gap-3">
-                    <button onClick={onCancel} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-slate-200 gap-3">
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <button onClick={onCancel} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 transition-colors flex-shrink-0">
                         <ArrowLeft className="h-5 w-5" />
                     </button>
                     <div>
-                        <h2 className="text-xl font-black text-slate-900 leading-tight">Create Invoice</h2>
+                        <h2 className="text-lg md:text-xl font-black text-slate-900 leading-tight">Create Invoice</h2>
                     </div>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-row items-center gap-3 md:gap-6 w-full md:w-auto justify-end">
                     <div className="text-right">
-                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-0.5">Invoice Number</label>
+                        <label className="block text-[8px] md:text-[9px] font-black text-slate-400 uppercase mb-0.5">Invoice Date</label>
+                        <input
+                            type="date"
+                            className="bg-slate-50 border-none rounded-lg px-2 py-1 md:px-3 md:py-1.5 text-right font-mono font-bold text-xs md:text-sm text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none w-28 md:w-40"
+                            value={invoiceDate}
+                            onChange={(e) => setInvoiceDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="text-right">
+                        <label className="block text-[8px] md:text-[9px] font-black text-slate-400 uppercase mb-0.5">Invoice Number</label>
                         <input
                             type="text"
-                            className="bg-slate-50 border-none rounded-lg px-3 py-1.5 text-right font-mono font-bold text-base text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none w-48"
+                            className="bg-slate-50 border-none rounded-lg px-2 py-1 md:px-3 md:py-1.5 text-right font-mono font-bold text-sm md:text-base text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none w-32 md:w-48"
                             value={invoiceNo}
                             onChange={(e) => setInvoiceNo(e.target.value)}
                         />
@@ -1002,24 +1015,140 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                 <Plus className="h-3.5 w-3.5" /> Add Item
                             </button>
                         </div>
-                        <div className="p-0 overflow-x-auto">
-                            <table className="w-full min-w-[800px]">
-                                <thead className="bg-slate-50/50 text-[11px] font-black uppercase text-slate-400 border-b">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left">Product Selection</th>
-                                        <th className="px-2 py-3 text-center w-24">Bags</th>
-                                        <th className="px-2 py-3 text-center w-24">Wt (kg)</th>
-                                        <th className="px-2 py-3 text-center w-32" title="Quantity in MTS">Quantity</th>
-                                        <th className="px-2 py-3 text-center w-48 text-indigo-600">Link to PO</th>
-                                        <th className="px-2 py-3 text-center w-32">Rate (₹)</th>
-                                        <th className="px-4 py-3 text-right w-36">Line Total</th>
-                                        <th className="px-4 py-3 w-16"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {lines.map((line, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-4 py-2.5">
+                        <div className="p-0">
+                            {/* Desktop Table View */}
+                            <div className="hidden lg:block overflow-x-auto">
+                                <table className="w-full min-w-[800px]">
+                                    <thead className="bg-slate-50/50 text-[11px] font-black uppercase text-slate-400 border-b">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left">Product Selection</th>
+                                            <th className="px-2 py-3 text-center w-24">Bags</th>
+                                            <th className="px-2 py-3 text-center w-24">Wt (kg)</th>
+                                            <th className="px-2 py-3 text-center w-32" title="Quantity in MTS">Quantity</th>
+                                            <th className="px-2 py-3 text-center w-48 text-indigo-600">Link to PO</th>
+                                            <th className="px-2 py-3 text-center w-32">Rate (₹)</th>
+                                            <th className="px-4 py-3 text-right w-36">Line Total</th>
+                                            <th className="px-4 py-3 w-16"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {lines.map((line, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-2.5">
+                                                    <select
+                                                        className="w-full bg-slate-100/50 border-none rounded-lg px-2.5 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        value={line.productId}
+                                                        onChange={(e) => updateLine(idx, 'productId', e.target.value)}
+                                                        disabled={!fromLocation}
+                                                    >
+                                                        <option value="">{fromLocation ? 'Select Product' : 'Select Location'}</option>
+                                                        {products.map(p => {
+                                                            const totalStock = Object.values(p.locations || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+                                                            return (
+                                                                <option key={p.id} value={String(p.id)}>
+                                                                    {p.name} ({totalStock.toFixed(1)} mts)
+                                                                </option>
+                                                            );
+                                                        })}
+                                                    </select>
+                                                </td>
+                                                <td className="px-2 py-2.5">
+                                                    <input
+                                                        type="text"
+                                                        className="w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-center text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="0"
+                                                        value={line.bags}
+                                                        onChange={(e) => updateLine(idx, 'bags', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="px-2 py-2.5">
+                                                    <input
+                                                        type="text"
+                                                        className="w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-center text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="50"
+                                                        value={line.bagWeight}
+                                                        onChange={(e) => updateLine(idx, 'bagWeight', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="px-2 py-2.5">
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            readOnly
+                                                            tabIndex="-1"
+                                                            className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-2 pr-8 py-2 text-center text-sm font-black text-indigo-600 dark:text-indigo-400 cursor-not-allowed outline-none"
+                                                            value={line.qty}
+                                                        />
+                                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400">MTS</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-2 py-2.5">
+                                                    <select
+                                                        className={`w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none ${line.purchaseOrderId ? 'text-blue-600 bg-blue-50/50' : ''}`}
+                                                        value={line.purchaseOrderId}
+                                                        onChange={(e) => updateLine(idx, 'purchaseOrderId', e.target.value)}
+                                                        disabled={!selectedCustomer || !line.productId}
+                                                    >
+                                                        <option value="">No PO Link</option>
+                                                        {purchaseOrders
+                                                            .filter(po => po.customerId === selectedCustomer)
+                                                            .flatMap(po =>
+                                                                po.items
+                                                                    .filter(item => item.productId === line.productId && item.remainingQty > 0)
+                                                                    .map(item => ({
+                                                                        id: po.id,
+                                                                        poNumber: po.poNumber,
+                                                                        remaining: item.remainingQty
+                                                                    }))
+                                                            )
+                                                            .map(poItem => (
+                                                                <option key={`${poItem.id}-${line.productId}`} value={poItem.id}>
+                                                                    {poItem.poNumber} (Bal: {poItem.remaining} MTS)
+                                                                </option>
+                                                            ))
+                                                        }
+                                                    </select>
+                                                </td>
+                                                <td className="px-2 py-2.5">
+                                                    <input
+                                                        type="text"
+                                                        className="w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-center text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="0"
+                                                        value={line.price}
+                                                        onChange={(e) => updateLine(idx, 'price', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right">
+                                                    <input
+                                                        readOnly
+                                                        tabIndex="-1"
+                                                        className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-2 text-right text-sm font-black text-slate-900 dark:text-slate-100 cursor-not-allowed outline-none"
+                                                        value={`₹ ${(Number(String(line.qty || 0).replace(/[^0-9.]/g, '')) * Number(String(line.price || 0).replace(/[^0-9.]/g, ''))).toLocaleString('en-IN', { minimumFractionDigits: 1 })}`}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right">
+                                                    <button onClick={() => removeLine(idx)} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {lines.length === 0 && (
+                                            <tr>
+                                                <td colSpan="8" className="px-6 py-20 text-center text-slate-400 font-bold">No items listed. Start adding products.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="lg:hidden divide-y divide-slate-100">
+                                {lines.map((line, idx) => (
+                                    <div key={idx} className="p-4 space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-1 mr-2">
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Product Selection</label>
                                                 <select
                                                     className="w-full bg-slate-100/50 border-none rounded-lg px-2.5 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                                                     value={line.productId}
@@ -1036,38 +1165,48 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                                         );
                                                     })}
                                                 </select>
-                                            </td>
-                                            <td className="px-2 py-2.5">
+                                            </div>
+                                            <button onClick={() => removeLine(idx)} className="p-2.5 text-rose-500 bg-rose-50 rounded-xl transition-all active:scale-95">
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Bags</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-center text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    className="w-full bg-slate-100/50 border-none rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-center"
                                                     placeholder="0"
                                                     value={line.bags}
                                                     onChange={(e) => updateLine(idx, 'bags', e.target.value)}
                                                 />
-                                            </td>
-                                            <td className="px-2 py-2.5">
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Wt (kg)</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-center text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    className="w-full bg-slate-100/50 border-none rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-center"
                                                     placeholder="50"
                                                     value={line.bagWeight}
                                                     onChange={(e) => updateLine(idx, 'bagWeight', e.target.value)}
                                                 />
-                                            </td>
-                                            <td className="px-2 py-2.5">
-                                                <div className="relative">
-                                                    <input
-                                                        type="text"
-                                                        readOnly
-                                                        tabIndex="-1"
-                                                        className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-2 pr-8 py-2 text-center text-sm font-black text-indigo-600 dark:text-indigo-400 cursor-not-allowed outline-none"
-                                                        value={line.qty}
-                                                    />
-                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400">MTS</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-2 py-2.5">
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Rate (₹)</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-slate-100/50 border-none rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-center"
+                                                    placeholder="0"
+                                                    value={line.price}
+                                                    onChange={(e) => updateLine(idx, 'price', e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-indigo-600 uppercase mb-1 font-black">Link to PO</label>
                                                 <select
                                                     className={`w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none ${line.purchaseOrderId ? 'text-blue-600 bg-blue-50/50' : ''}`}
                                                     value={line.purchaseOrderId}
@@ -1088,48 +1227,30 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                                         )
                                                         .map(poItem => (
                                                             <option key={`${poItem.id}-${line.productId}`} value={poItem.id}>
-                                                                {poItem.poNumber} (Bal: {poItem.remaining} MTS)
+                                                                {poItem.poNumber} ({poItem.remaining} M)
                                                             </option>
                                                         ))
                                                     }
                                                 </select>
-                                                {line.purchaseOrderId && (
-                                                    <div className="text-[8px] font-black text-blue-500 uppercase tracking-tighter text-center mt-1">
-                                                        Linked to PO
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-2 py-2.5">
-                                                <input
-                                                    type="text"
-                                                    className="w-full bg-slate-100/50 border-none rounded-lg px-2 py-2 text-center text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                                                    placeholder="0"
-                                                    value={line.price}
-                                                    onChange={(e) => updateLine(idx, 'price', e.target.value)}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right">
-                                                <input
-                                                    readOnly
-                                                    tabIndex="-1"
-                                                    className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-2 text-right text-sm font-black text-slate-900 dark:text-slate-100 cursor-not-allowed outline-none"
-                                                    value={`₹ ${(Number(String(line.qty || 0).replace(/[^0-9.]/g, '')) * Number(String(line.price || 0).replace(/[^0-9.]/g, ''))).toLocaleString('en-IN', { minimumFractionDigits: 1 })}`}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right">
-                                                <button onClick={() => removeLine(idx)} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {lines.length === 0 && (
-                                        <tr>
-                                            <td colSpan="7" className="px-6 py-20 text-center text-slate-400 font-bold">No items listed. Start adding products.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                                            <div className="space-y-0.5">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase">Total Qty</p>
+                                                <p className="text-sm font-black text-indigo-600">{line.qty} MTS</p>
+                                            </div>
+                                            <div className="text-right space-y-0.5">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase">Subtotal</p>
+                                                <p className="text-sm font-black text-slate-900 dark:text-white">₹ {(Number(String(line.qty || 0).replace(/[^0-9.]/g, '')) * Number(String(line.price || 0).replace(/[^0-9.]/g, ''))).toLocaleString('en-IN')}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {lines.length === 0 && (
+                                    <div className="px-6 py-20 text-center text-slate-400 font-bold">No items listed. Start adding products.</div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -1364,7 +1485,7 @@ function InvoiceViewModal({ invoice, onClose }) {
                             <h1 className="text-2xl font-bold text-slate-900">INVOICE</h1>
                             <p className="text-slate-500 mt-1">#{invoice.invoiceNo}</p>
                             <p className="text-sm text-slate-500 mt-2">
-                                Date: {invoice.createdAt?.seconds ? format(new Date(invoice.createdAt.seconds * 1000), 'dd MMM yyyy') : '-'}
+                                Date: {invoice.date ? format(new Date(invoice.date), 'dd MMM yyyy') : (invoice.createdAt?.seconds ? format(new Date(invoice.createdAt.seconds * 1000), 'dd MMM yyyy') : '-')}
                             </p>
                         </div>
                         <div className="text-right">
