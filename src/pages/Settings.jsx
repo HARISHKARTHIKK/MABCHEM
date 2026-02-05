@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
-import { Save, Building2, FileText, Package, Truck, Shield, Calendar, Wrench, Plus, Trash2, Loader2, AlertCircle, Key, RefreshCw, Clock, History, AlertTriangle } from 'lucide-react';
+import { Save, Building2, FileText, Package, Truck, Shield, Calendar, Wrench, Plus, Trash2, Loader2, AlertCircle, Key, RefreshCw, Clock, History, AlertTriangle, X, UserPlus, Search, Users, MapPin } from 'lucide-react';
 import { backfillDispatches, updateStockLevel } from '../services/firestoreService';
 import { db } from '../lib/firebase';
-import { collection, getDocs, updateDoc, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { Users } from 'lucide-react';
+import { collection, getDocs, updateDoc, doc, query, orderBy, onSnapshot, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { format } from 'date-fns';
 
 export default function Settings() {
@@ -16,6 +17,15 @@ export default function Settings() {
     // User Management State
     const [users, setUsers] = useState([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
+    const [showAddUserModal, setShowAddUserModal] = useState(false);
+    const [isAddingUser, setIsAddingUser] = useState(false);
+    const [addUserError, setAddUserError] = useState('');
+    const [newUserData, setNewUserData] = useState({
+        email: '',
+        password: '',
+        role: 'viewer',
+        location: ''
+    });
 
     // Stock Reconciliation State
     const [products, setProducts] = useState([]);
@@ -63,6 +73,70 @@ export default function Settings() {
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, [field]: value } : u));
         } catch (error) {
             alert("Failed to update user: " + error.message);
+        }
+    };
+
+    const handleDeleteUser = async (userId) => {
+        if (!confirm("Are you sure you want to delete this user's database record? (This doesn't delete their Auth account)")) return;
+        try {
+            await deleteDoc(doc(db, 'users', userId));
+        } catch (error) {
+            alert("Failed to delete user: " + error.message);
+        }
+    };
+
+    const handleAddUser = async () => {
+        if (!newUserData.email || !newUserData.password) {
+            setAddUserError("Email and Password are required.");
+            return;
+        }
+        if (newUserData.password.length < 6) {
+            setAddUserError("Password should be at least 6 characters.");
+            return;
+        }
+
+        setIsAddingUser(true);
+        setAddUserError('');
+
+        try {
+            // FIREBASE CONFIG - Redefining here as it's cleaner than secondary app complexity if we just need one-off creation
+            // However, to stay logged in as admin, we MUST use a secondary app for createUser
+            const secondaryConfig = {
+                apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+                authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+                projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+                storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+                messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+                appId: import.meta.env.VITE_FIREBASE_APP_ID
+            };
+
+            const secondaryApp = initializeApp(secondaryConfig, "Secondary");
+            const secondaryAuth = getAuth(secondaryApp);
+
+            const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUserData.email, newUserData.password);
+            const user = userCredential.user;
+
+            // Create firestore doc
+            await setDoc(doc(db, "users", user.uid), {
+                email: user.email,
+                role: newUserData.role,
+                location: newUserData.location,
+                active: true,
+                createdAt: serverTimestamp()
+            });
+
+            // Cleanup secondary app
+            await secondaryAuth.signOut();
+            // Note: We can't easily "delete" the secondary app in this context, but signing out is enough.
+
+            setShowAddUserModal(false);
+            setNewUserData({ email: '', password: '', role: 'viewer', location: '' });
+            alert("User account created successfully!");
+        } catch (error) {
+            console.error(error);
+            setAddUserError(error.message);
+        } finally {
+            setIsAddingUser(false);
         }
     };
 
@@ -170,7 +244,7 @@ export default function Settings() {
         { id: 'company', label: 'Company', icon: Building2 },
         { id: 'invoice', label: 'Invoices', icon: FileText },
         { id: 'inventory', label: 'Inventory', icon: Package },
-        { id: 'locations', label: 'Locations', icon: MapPinIcon },
+        { id: 'locations', label: 'Locations', icon: MapPin },
         { id: 'transport', label: 'Transport', icon: Truck },
         { id: 'compliance', label: 'Compliance', icon: Shield },
         { id: 'users', label: 'Users', icon: Users },
@@ -378,7 +452,15 @@ export default function Settings() {
 
                     {activeTab === 'users' && (
                         <div className="space-y-4">
-                            <h3 className="text-lg font-bold text-slate-800 mb-4 pb-2 border-b">User Management</h3>
+                            <div className="flex items-center justify-between mb-4 pb-2 border-b">
+                                <h3 className="text-lg font-bold text-slate-800">User Management</h3>
+                                <button
+                                    onClick={() => setShowAddUserModal(true)}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
+                                >
+                                    <Plus className="h-4 w-4" /> Add New User
+                                </button>
+                            </div>
                             {loadingUsers ? <div className="flex py-10 justify-center"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /></div> : (
                                 <div className="grid grid-cols-1 gap-3">
                                     {users.map(user => (
@@ -413,12 +495,114 @@ export default function Settings() {
                                                 >
                                                     {user.active ? 'Active' : 'Inactive'}
                                                 </button>
+                                                <button
+                                                    onClick={() => handleDeleteUser(user.id)}
+                                                    className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                                                    title="Delete User (Firestore Record Only)"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
                                     {users.length === 0 && <p className="text-slate-500 italic text-center py-10">No users found.</p>}
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {showAddUserModal && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-blue-50 rounded-xl"><Plus className="h-5 w-5 text-blue-600" /></div>
+                                        <h3 className="text-lg font-bold text-slate-800">Add New System User</h3>
+                                    </div>
+                                    <button onClick={() => { setShowAddUserModal(false); setAddUserError(''); }} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="h-5 w-5 text-slate-400" /></button>
+                                </div>
+
+                                {addUserError && (
+                                    <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex gap-2">
+                                        <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                                        <p className="text-xs text-red-600 font-medium">{addUserError}</p>
+                                    </div>
+                                )}
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email Address</label>
+                                        <input
+                                            type="email"
+                                            placeholder="user@example.com"
+                                            className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                            value={newUserData.email}
+                                            onChange={e => setNewUserData({ ...newUserData, email: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Temporary Password</label>
+                                        <input
+                                            type="password"
+                                            placeholder="Minimum 6 characters"
+                                            className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                            value={newUserData.password}
+                                            onChange={e => setNewUserData({ ...newUserData, password: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Initial Role</label>
+                                            <select
+                                                className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"
+                                                value={newUserData.role}
+                                                onChange={e => setNewUserData({ ...newUserData, role: e.target.value })}
+                                            >
+                                                <option value="viewer">Viewer</option>
+                                                <option value="manager">Manager</option>
+                                                <option value="admin">Admin</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Base Location</label>
+                                            <select
+                                                className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"
+                                                value={newUserData.location}
+                                                onChange={e => setNewUserData({ ...newUserData, location: e.target.value })}
+                                            >
+                                                <option value="">All Locs</option>
+                                                {(formData?.locations || []).map(l => (
+                                                    <option key={l.name} value={l.name}>{l.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                        <div className="flex gap-2">
+                                            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                                            <p className="text-[10px] text-amber-700 leading-normal">
+                                                <strong>Note:</strong> This will create a new login account. The user will be automatically added to the database. Make sure the email is correct.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 mt-8">
+                                    <button
+                                        onClick={() => { setShowAddUserModal(false); setAddUserError(''); }}
+                                        className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleAddUser}
+                                        disabled={isAddingUser}
+                                        className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50"
+                                    >
+                                        {isAddingUser ? <Loader2 className="animate-spin h-4 w-4 mx-auto" /> : 'Create Account'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
