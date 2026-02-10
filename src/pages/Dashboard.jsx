@@ -49,15 +49,15 @@ export default function Dashboard() {
         // FULL DATA FETCHING FOR SUMMARY
         // ---------------------------------------------------------
         const unsubAllDispatches = onSnapshot(collection(db, 'dispatches'), (snap) => {
-            setAllDispatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setAllDispatches(snap.docs.map(d => ({ id: d.id, type: 'DISPATCH', ...d.data() })));
         });
 
         const unsubAllImports = onSnapshot(collection(db, 'imports'), (snap) => {
-            setAllImports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setAllImports(snap.docs.map(d => ({ id: d.id, type: 'IMPORT', ...d.data() })));
         });
 
         const unsubAllPurchases = onSnapshot(collection(db, 'localPurchases'), (snap) => {
-            setAllPurchases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setAllPurchases(snap.docs.map(d => ({ id: d.id, type: 'LOCAL', ...d.data() })));
         });
 
         const unsubSnapshots = onSnapshot(collection(db, 'stockSnapshots'), (snap) => {
