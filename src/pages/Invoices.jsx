@@ -1647,7 +1647,7 @@ function InvoiceItemsLoader({ invoiceId }) {
             {items.map((item, idx) => (
                 <tr key={idx}>
                     <td className="py-3 font-medium text-slate-800">
-                        {item.name || item.productId || 'Unknown Item'}
+                        {item.productName || item.name || item.productId || 'Unknown Item'}
                     </td>
                     <td className="py-3 text-right">{Number(item.quantity).toFixed(3)}</td>
                     <td className="py-3 text-right">₹ {Number(item.price).toFixed(2)}</td>
