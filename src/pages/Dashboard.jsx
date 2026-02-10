@@ -515,9 +515,9 @@ export default function Dashboard() {
 
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                     {/* Desktop Table */}
-                    <div className="hidden sm:block overflow-x-auto">
-                        <table className="w-full text-left text-sm text-slate-600">
-                            <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[11px] tracking-wider">
+                    <div className="hidden sm:block overflow-x-auto max-h-[480px] overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left text-sm text-slate-600 sticky-header">
+                            <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[11px] tracking-wider sticky top-0 z-10">
                                 <tr>
                                     <th className="px-3 py-2">Invoice</th>
                                     <th className="px-3 py-2">Customer</th>
@@ -534,14 +534,28 @@ export default function Dashboard() {
                             </thead>
                             {(() => {
                                 const groups = [];
-                                dispatches.forEach((d) => {
-                                    const date = d.createdAt?.seconds ? format(new Date(d.createdAt.seconds * 1000), 'dd MMM yyyy') : 'Unknown Date';
-                                    if (groups.length === 0 || groups[groups.length - 1].date !== date) {
-                                        groups.push({ date, items: [d] });
-                                    } else {
-                                        groups[groups.length - 1].items.push(d);
-                                    }
+                                // Get all dates in the current month up to today
+                                const today = new Date();
+                                const start = startOfMonth(today);
+                                const totalDays = today.getDate();
+
+                                // Create a map of existing dispatches by date
+                                const dispatchMap = {};
+                                dispatches.forEach(d => {
+                                    const dateStr = d.createdAt?.seconds ? format(new Date(d.createdAt.seconds * 1000), 'dd MMM yyyy') : 'Unknown Date';
+                                    if (!dispatchMap[dateStr]) dispatchMap[dateStr] = [];
+                                    dispatchMap[dateStr].push(d);
                                 });
+
+                                // Iterate from today backwards to start of month
+                                for (let i = totalDays; i >= 1; i--) {
+                                    const date = new Date(today.getFullYear(), today.getMonth(), i);
+                                    const dateStr = format(date, 'dd MMM yyyy');
+                                    groups.push({
+                                        date: dateStr,
+                                        items: dispatchMap[dateStr] || []
+                                    });
+                                }
 
                                 return groups.map((group, gIdx) => (
                                     <tbody key={group.date} className={gIdx > 0 ? 'border-t-4 border-slate-200 dark:border-slate-700' : ''}>
@@ -550,39 +564,47 @@ export default function Dashboard() {
                                                 📅 {group.date}
                                             </td>
                                         </tr>
-                                        {group.items.map((d) => (
-                                            <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                                <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 text-[14px]">{d.invoiceNo}</td>
-                                                <td className="px-3 py-2 text-slate-900 dark:text-slate-100 font-bold truncate max-w-[150px] text-[14px]" title={d.customerName}>
-                                                    {d.customerName || '-'}
-                                                </td>
-                                                <td className="px-3 py-2 text-slate-900 dark:text-slate-100 text-[14px] leading-tight truncate max-w-[120px]">{d.productName || 'Unknown'}</td>
-                                                <td className="px-3 py-2 text-[14px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                                    {d.bags ? `${d.bags} x ${d.bagWeight}kg` : '-'}
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-slate-800 dark:text-slate-200 text-[14px]">
-                                                    {(Number(d.quantity) || 0).toFixed(1)} <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">mts</span>
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
-                                                    ₹{(Number(d.unitPrice) || 0).toLocaleString('en-IN')}
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
-                                                    ₹{((Number(d.quantity) || 0) * (Number(d.unitPrice) || 0)).toLocaleString('en-IN')}
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400 text-[14px] text-nowrap">
-                                                    ₹{(Number(d.taxAmount) || 0).toFixed(0)}
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100 text-[14px] text-nowrap">
-                                                    ₹{(Number(d.itemTotal) || 0).toFixed(0)}
-                                                </td>
-                                                <td className="px-3 py-2 text-[14px] text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                                                    {d.transport?.vehicleNumber || '-'}
-                                                </td>
-                                                <td className="px-3 py-2 text-[14px] text-slate-800 dark:text-slate-200 truncate max-w-[100px]" title={d.remarks}>
-                                                    {d.remarks || '-'}
+                                        {group.items.length > 0 ? (
+                                            group.items.map((d) => (
+                                                <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                                    <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 text-[14px]">{d.invoiceNo}</td>
+                                                    <td className="px-3 py-2 text-slate-900 dark:text-slate-100 font-bold truncate max-w-[150px] text-[14px]" title={d.customerName}>
+                                                        {d.customerName || '-'}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-900 dark:text-slate-100 text-[14px] leading-tight truncate max-w-[120px]">{d.productName || 'Unknown'}</td>
+                                                    <td className="px-3 py-2 text-[14px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                        {d.bags ? `${d.bags} x ${d.bagWeight}kg` : '-'}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right text-slate-800 dark:text-slate-200 text-[14px]">
+                                                        {(Number(d.quantity) || 0).toFixed(1)} <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">mts</span>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
+                                                        ₹{(Number(d.unitPrice) || 0).toLocaleString('en-IN')}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 text-[14px] text-nowrap">
+                                                        ₹{((Number(d.quantity) || 0) * (Number(d.unitPrice) || 0)).toLocaleString('en-IN')}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400 text-[14px] text-nowrap">
+                                                        ₹{(Number(d.taxAmount) || 0).toFixed(0)}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100 text-[14px] text-nowrap">
+                                                        ₹{(Number(d.itemTotal) || 0).toFixed(0)}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-[14px] text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                                        {d.transport?.vehicleNumber || '-'}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-[14px] text-slate-800 dark:text-slate-200 truncate max-w-[100px]" title={d.remarks}>
+                                                        {d.remarks || '-'}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={11} className="px-3 py-4 text-center text-slate-400 italic font-medium">
+                                                    NO DESPATCH
                                                 </td>
                                             </tr>
-                                        ))}
+                                        )}
                                     </tbody>
                                 ));
                             })()}
@@ -671,9 +693,9 @@ export default function Dashboard() {
                     </button>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="hidden sm:block overflow-x-auto">
+                    <div className="hidden sm:block overflow-x-auto max-h-[480px] overflow-y-auto custom-scrollbar">
                         <table className="w-full text-left text-sm text-slate-600">
-                            <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[11px] tracking-wider">
+                            <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[11px] tracking-wider sticky top-0 z-10">
                                 <tr>
                                     <th className="px-3 py-2">Date</th>
                                     <th className="px-3 py-2">Type</th>
