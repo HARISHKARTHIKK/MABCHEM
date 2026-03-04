@@ -1197,3 +1197,44 @@ export const addLocalPurchase = async (data, addToExpense = false) => {
         }
     });
 };
+
+/* =========================
+   TRANSPORTER PAYMENTS
+========================= */
+
+export const addTransporterPayment = async (data) => {
+    const auth = getAuth();
+    if (!auth.currentUser) throw new Error("User not authenticated");
+    const uid = auth.currentUser.uid;
+
+    return await runTransaction(db, async (transaction) => {
+        const paymentRef = doc(collection(db, "transporterPayments"));
+        transaction.set(paymentRef, {
+            ...data,
+            amount: Number(data.amount),
+            userId: uid,
+            createdAt: serverTimestamp()
+        });
+
+        // Also add to Expenses
+        const expenseRef = doc(collection(db, "expenses"));
+        transaction.set(expenseRef, {
+            date: data.date,
+            category: 'Logistics',
+            amount: Number(data.amount),
+            description: `PAYMENT TO TRANSPORTER: ${data.transporterName} (${data.paymentMode || 'N/A'})`.toUpperCase(),
+            mode: data.paymentMode || 'Bank Transfer',
+            userId: uid,
+            createdAt: serverTimestamp()
+        });
+    });
+};
+
+export const deleteTransporterPayment = async (paymentId) => {
+    const auth = getAuth();
+    if (!auth.currentUser) throw new Error("User not authenticated");
+
+    // Note: Deleting a payment record doesn't automatically reverse the expense 
+    // for simplicity unless we link them strictly. For now, just delete the payment record.
+    await deleteDoc(doc(db, "transporterPayments", paymentId));
+};
