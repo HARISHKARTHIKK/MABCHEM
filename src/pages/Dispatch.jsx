@@ -69,7 +69,9 @@ export default function Dispatch() {
             'Origin': disp.location,
             'Quantity (mts)': (Number(disp.quantity) || 0).toFixed(1),
             'Vehicle Number': disp.vehicleNumber || disp.transport?.vehicleNumber || '-',
-            'Transport Mode': disp.transport?.mode || '-'
+            'Transport Mode': disp.transport?.mode || '-',
+            'LR Number': disp.transport?.lrNumber || '-',
+            'LR Date': disp.transport?.date || '-'
         }));
         exportToExcel(`Dispatch_Log_${format(new Date(), 'dd_MMM_yyyy')}.xlsx`, dataToExport);
     };

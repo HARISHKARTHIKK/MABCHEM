@@ -138,25 +138,51 @@ export default function Inventory() {
 
     const handleExport = () => {
         const dataToExport = [];
-        products.forEach(p => {
-            const locs = p.locations || {};
-            if (Object.keys(locs).length > 0) {
-                Object.entries(locs).forEach(([loc, qty]) => {
+        const itemsToProcess = view === 'logs' ? filteredLogs : products;
+
+        if (view === 'logs') {
+            filteredLogs.forEach(log => {
+                dataToExport.push({
+                    'Date': log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleString() : '-',
+                    'Product Name': log.productName || 'Unknown',
+                    'Location': log.location || '-',
+                    'Quantity (mts)': (Number(log.changeQty) || 0).toFixed(1),
+                    'Reason': log.reason || '-'
+                });
+            });
+        } else {
+            products.forEach(p => {
+                const locs = p.locations || {};
+                const totalInHand = Object.values(locs).reduce((a, b) => a + (Number(b) || 0), 0);
+
+                if (Object.keys(locs).length > 0) {
+                    Object.entries(locs).forEach(([loc, qty]) => {
+                        dataToExport.push({
+                            'Product Name': p.name,
+                            'SKU': p.sku || '-',
+                            'HSN': p.hsn || '-',
+                            'Price (₹)': p.price || 0,
+                            'Location': loc,
+                            'Location Stock (mts)': Number(qty),
+                            'Total Product Stock (mts)': totalInHand
+                        });
+                    });
+                } else {
                     dataToExport.push({
                         'Product Name': p.name,
-                        'Location': loc,
-                        'Stock Quantity (mts)': Number(qty)
+                        'SKU': p.sku || '-',
+                        'HSN': p.hsn || '-',
+                        'Price (₹)': p.price || 0,
+                        'Location': 'Unassigned',
+                        'Location Stock (mts)': 0,
+                        'Total Product Stock (mts)': totalInHand
                     });
-                });
-            } else {
-                dataToExport.push({
-                    'Product Name': p.name,
-                    'Location': 'Unassigned',
-                    'Stock Quantity (mts)': 0
-                });
-            }
-        });
-        exportToExcel('inventory_export.xlsx', dataToExport);
+                }
+            });
+        }
+
+        const fileName = view === 'logs' ? `Inventory_Logs_${format(new Date(), 'dd_MM_yyyy')}.xlsx` : `Inventory_Stock_${format(new Date(), 'dd_MM_yyyy')}.xlsx`;
+        exportToExcel(dataToExport, fileName);
     };
 
     // Filtering

@@ -278,9 +278,12 @@ export default function TransporterReports() {
                 'Party (Supplier/Customer)': rec.partyName,
                 'Location': rec.locationName,
                 'Transporter Name': rec.transporterName || '-',
+                'Transporter GSTIN': rec.transporterGSTIN || '-',
+                'Vehicle Number': rec.vehicleNumber || '-',
                 'Document Value': rec.docValue || 0,
                 'Transportation Cost': rec.transportationCost || 0,
-                'Transport Payment': rec.transportPaymentType || '-'
+                'Transport Payment': rec.transportPaymentType || '-',
+                'LR Number': rec.lrNumber || '-'
             };
         });
 

@@ -110,15 +110,21 @@ export default function Invoices() {
 
     const handleExport = () => {
         const dataToExport = invoices.map(inv => ({
+            'Invoice Date': inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-',
             'Invoice Number': inv.invoiceNo,
+            'From Location (Origin)': inv.fromLocation || '-',
             'Customer Name': inv.customerName,
+            'Products': (inv.itemsSummary || []).map(i => `${i.productName} (${i.quantity})`).join(', '),
             'Subtotal': inv.subtotal || 0,
+            'GST Amount': inv.taxAmount || 0,
             'Transport Amount': inv.transport?.amount || 0,
             'Transport Included': inv.transport?.isExtra ? 'No' : 'Yes',
-            'Vehicle Number': inv.vehicleNumber || inv.transport?.vehicleNumber || '-',
-            'GST Amount': inv.taxAmount || 0,
             'Total Amount': inv.totalAmount,
-            'Invoice Date': inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-'
+            'Vehicle Number': inv.vehicleNumber || inv.transport?.vehicleNumber || '-',
+            'E-Way Bill No': inv.eWayBillNo || '-',
+            'LR Number': inv.transport?.lrNumber || '-',
+            'LR Date': inv.transport?.date || '-',
+            'Status': inv.status || 'Active'
         }));
         exportToExcel('invoices_export.xlsx', dataToExport);
     };

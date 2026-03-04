@@ -167,12 +167,16 @@ export default function StockManagement() {
     const handleExport = () => {
         const data = stockSummary.map(item => ({
             'Product Name': item.name,
+            'SKU': item.sku || '-',
+            'HSN': item.hsn || '-',
             'Opening Stock': item.openingStock,
             'Total In (Purchase)': item.totalIn,
             'Total Out (Sales)': item.totalOut,
             'Current Balance': item.balance,
             ...Object.fromEntries(
                 Object.entries(item.locationDetails).flatMap(([loc, d]) => [
+                    [`${loc} In`, d.in],
+                    [`${loc} Out`, d.out],
                     [`${loc} Balance`, d.balance]
                 ])
             )
