@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { addPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } from '../services/firestoreService';
+import { exportToExcel } from '../utils/exportToExcel';
+import { Download } from 'lucide-react';
 
 export default function PurchaseOrders() {
     const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -103,6 +105,23 @@ export default function PurchaseOrders() {
         }
     };
 
+    const handleExport = () => {
+        const data = filteredPOs.flatMap(po =>
+            po.items.map(item => ({
+                'PO Number': po.poNumber,
+                'PO Date': po.date,
+                'Status': po.status,
+                'Customer': po.customerName,
+                'Product': item.productName,
+                'Rate': item.rate,
+                'Total Qty': item.totalQty,
+                'Delivered Qty': item.deliveredQty,
+                'Remaining Qty': item.remainingQty
+            }))
+        );
+        exportToExcel(data, `Purchase_Orders_Export_${format(new Date(), 'dd_MM_yyyy')}`);
+    };
+
     if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
     return (
@@ -115,12 +134,20 @@ export default function PurchaseOrders() {
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">Manage customer orders and tracking</p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/20"
-                >
-                    <Plus className="h-4 w-4" /> Create PO
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                        onClick={handleExport}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    >
+                        <Download className="h-4 w-4" /> Export Excel
+                    </button>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/20"
+                    >
+                        <Plus className="h-4 w-4" /> Create PO
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">

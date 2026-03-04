@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit, doc, deleteDoc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { exportToCSV } from '../utils/exportToCSV';
+import { exportToExcel } from '../utils/exportToExcel';
 import {
     ClipboardList, Search, Loader2, Package, Plus, MapPin,
     ArrowRightLeft, FileSpreadsheet, ChevronDown, ChevronRight, Edit, Trash2, Box
@@ -156,7 +156,7 @@ export default function Inventory() {
                 });
             }
         });
-        exportToCSV('inventory_export.csv', dataToExport);
+        exportToExcel('inventory_export.xlsx', dataToExport);
     };
 
     // Filtering

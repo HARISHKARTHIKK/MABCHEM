@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { exportToCSV } from '../utils/exportToCSV';
+import { exportToExcel } from '../utils/exportToExcel';
 import { generateEInvoiceJSON, generateEwayBillJSON, downloadJSON } from '../utils/ewaybillExport';
-import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn, Clock, Edit2 } from 'lucide-react';
+import { Plus, Search, FileText, User, Calendar, Trash2, ArrowLeft, Loader2, CheckCircle, MapPin, AlertTriangle, Info, Zap, Copy, Check, ExternalLink, Download, LogIn, Clock, Edit2, History } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
 import { createInvoice, updateInvoice, deleteInvoice } from '../services/firestoreService';
-import { format } from 'date-fns';
+import { format, startOfDay, eachDayOfInterval, isSameDay } from 'date-fns';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { validateEInvoice } from '../utils/eInvoiceValidator';
@@ -14,7 +14,7 @@ import { validateEInvoice } from '../utils/eInvoiceValidator';
 export default function Invoices() {
     const { userRole } = useAuth();
     const { settings } = useSettings();
-    const [view, setView] = useState('list'); // 'list', 'create', or 'edit'
+    const [view, setView] = useState('list'); // 'list', 'create', 'edit', or 'history'
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -83,11 +83,30 @@ export default function Invoices() {
 
             return matchesSearch && matchesDate;
         })
-        .sort((a, b) => {
-            const timeA = a.createdAt?.seconds || 0;
-            const timeB = b.createdAt?.seconds || 0;
-            return timeB - timeA;
-        });
+    const daysToDisplay = (() => {
+        if (filteredInvoices.length === 0 && !startDate && !endDate) return [];
+        let start, end;
+        if (startDate && endDate) {
+            start = new Date(startDate);
+            end = new Date(endDate);
+        } else if (filteredInvoices.length > 0) {
+            const dates = filteredInvoices.map(inv => inv.date ? new Date(inv.date) : (inv.createdAt?.seconds ? new Date(inv.createdAt.seconds * 1000) : null)).filter(Boolean);
+            start = new Date(Math.min(...dates));
+            end = new Date(Math.max(...dates));
+        } else return [];
+        try {
+            return eachDayOfInterval({ start: startOfDay(start), end: startOfDay(end) }).sort((a, b) => b - a);
+        } catch (e) { return []; }
+    })();
+
+    const groupedByLocation = filteredInvoices.reduce((acc, inv) => {
+        const loc = inv.fromLocation || 'Unknown';
+        if (!acc[loc]) acc[loc] = [];
+        acc[loc].push(inv);
+        return acc;
+    }, {});
+
+    const sortedLocations = Object.keys(groupedByLocation).sort();
 
     const handleExport = () => {
         const dataToExport = invoices.map(inv => ({
@@ -101,7 +120,7 @@ export default function Invoices() {
             'Total Amount': inv.totalAmount,
             'Invoice Date': inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-'
         }));
-        exportToCSV('invoices_export.csv', dataToExport);
+        exportToExcel('invoices_export.xlsx', dataToExport);
     };
 
     const handleExportJSON = async (e, inv) => {
@@ -169,6 +188,10 @@ export default function Invoices() {
         return <CreateInvoice invoice={editingInvoice} onCancel={() => { setView('list'); setEditingInvoice(null); }} onSuccess={() => { setView('list'); setEditingInvoice(null); }} />;
     }
 
+    if (view === 'history') {
+        return <InvoiceAuditLog invoices={invoices} onBack={() => setView('list')} />;
+    }
+
     if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" /></div>;
 
     return (
@@ -183,10 +206,18 @@ export default function Invoices() {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={() => setView('history')}
+                        className="flex items-center gap-2 bg-white text-slate-600 border border-slate-300 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 px-4 py-2.5 rounded-lg font-medium transition-all shadow-sm active:scale-95"
+                    >
+                        <History className="h-4 w-4" />
+                        Edit History
+                    </button>
+                    <button
                         onClick={handleExport}
                         className="flex items-center gap-2 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 px-4 py-2.5 rounded-lg font-medium transition-all shadow-sm active:scale-95"
                     >
-                        Export CSV
+                        <Download className="h-4 w-4" />
+                        Export Excel
                     </button>
                     {userRole !== 'viewer' && (
                         <button
@@ -200,8 +231,9 @@ export default function Invoices() {
                 </div>
             </div>
 
+            {/* Search and Filters Card */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-50/50">
+                <div className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-white">
                     <div className="relative w-full sm:w-80">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input
@@ -239,206 +271,269 @@ export default function Invoices() {
                         )}
                     </div>
                 </div>
+            </div>
 
-                <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full text-left text-sm text-slate-600 min-w-[1000px]">
-                        <thead className="bg-slate-50 text-slate-700 font-semibold uppercase text-xs tracking-wider">
-                            <tr>
-                                <th className="px-6 py-4">Invoice No</th>
-                                <th className="px-6 py-4">Date</th>
-                                <th className="px-6 py-4">Customer</th>
-                                <th className="px-6 py-4">Origin</th>
-                                <th className="px-6 py-4 text-right">Amount</th>
-                                <th className="px-6 py-4 text-center">E-Way Bill</th>
-                                <th className="px-6 py-4 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredInvoices.map((inv) => (
-                                <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
-                                    <td className="px-6 py-4 font-mono font-medium text-slate-700">{inv.invoiceNo}</td>
-                                    <td className="px-6 py-4 text-slate-500">
-                                        {inv.date ? format(new Date(inv.date), 'dd MMM yyyy') : (inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-')}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="font-medium text-slate-900">{inv.customerName}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className="flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded w-fit">
-                                            <MapPin className="h-3 w-3" /> {inv.fromLocation || '-'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-medium text-slate-600">
-                                        ₹ {(Number(inv.subtotal) || 0).toFixed(0)}
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-black text-slate-900 border-l border-slate-50">
-                                        ₹ {(Number(inv.totalAmount) || 0).toFixed(0)}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col items-center gap-1">
-                                            {inv.ewayBillNo ? (
-                                                <div className="flex flex-col items-center">
-                                                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 animate-fadeIn">
-                                                        <CheckCircle className="h-2.5 w-2.5" /> Generated
-                                                    </span>
-                                                    <button
-                                                        onClick={(e) => copyToClipboard(e, inv.ewayBillNo, inv.id)}
-                                                        className="mt-1 flex items-center gap-1 text-[11px] font-mono text-slate-500 hover:text-blue-600 transition-colors"
-                                                    >
-                                                        {inv.ewayBillNo}
-                                                        {copiedId === inv.id ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
-                                                    </button>
-                                                </div>
-                                            ) : inv.ewayBillStatus === 'FAILED' ? (
-                                                <div className="group relative flex flex-col items-center">
-                                                    <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                                        <AlertTriangle className="h-2.5 w-2.5" /> Failed
-                                                    </span>
-                                                    <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl z-50 leading-tight">
-                                                        {inv.tallyGspResponse?.error || 'Registration failed at NIC. Check HSN/GSTIN.'}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center gap-1.5 min-w-[140px]">
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-tight">Manual Upload</span>
-                                                    {userRole !== 'viewer' && (
-                                                        <div className="flex flex-row gap-1.5">
-                                                            <button
-                                                                onClick={(e) => handleExportJSON(e, inv)}
-                                                                disabled={generatingEway[inv.id]}
-                                                                title="Export E-Invoice JSON"
-                                                                className={`flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-amber-50 text-amber-600 hover:bg-amber-100 hover:shadow-amber-100/50 hover:scale-105 active:scale-95 ${generatingEway[inv.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                            >
-                                                                {generatingEway[inv.id] ? (
-                                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                                ) : (
-                                                                    <Download className="h-4 w-4 fill-amber-500 text-amber-500" />
-                                                                )}
-                                                            </button>
-                                                            <a
-                                                                href="https://einvoice1.gst.gov.in/"
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                title="Go to E-Invoice Portal"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-blue-50 text-blue-700 hover:bg-blue-100 hover:shadow-blue-200 hover:scale-105 active:scale-95 no-underline border border-blue-100"
-                                                            >
-                                                                <ExternalLink className="h-4 w-4" />
-                                                            </a>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-1">
-                                            {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
-                                                <>
-                                                    <button
-                                                        onClick={() => { setEditingInvoice(inv); setView('edit'); }}
-                                                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-full transition-colors"
-                                                        title="Edit Invoice"
-                                                    >
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => handleDelete(e, inv)}
-                                                        className="p-2 text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
-                                                        title="Delete Invoice"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </>
-                                            )}
-                                            <button
-                                                onClick={() => setSelectedInvoice(inv)}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                                                title="View Invoice"
-                                            >
-                                                <FileText className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                            {filteredInvoices.length === 0 && (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-slate-400">
-                                        No invoices found. Create one to get started.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+            {/* Invoices by Location */}
+            {filteredInvoices.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center text-slate-400">
+                    No invoices found. Create one to get started.
                 </div>
-
-                <div className="sm:hidden grid grid-cols-1 divide-y divide-slate-100 dark:divide-slate-700">
-                    {filteredInvoices.map((inv) => (
-                        <div
-                            key={inv.id}
-                            onClick={() => setSelectedInvoice(inv)}
-                            className="p-4 bg-white dark:bg-slate-800 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors flex flex-col gap-3"
-                        >
-                            <div className="flex justify-between items-start">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold text-slate-900 dark:text-white">{inv.invoiceNo}</span>
-                                        {inv.ewayBillNo ? (
-                                            <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter flex items-center gap-0.5">
-                                                <Zap className="h-2 w-2 fill-green-500" /> E-WAY
-                                            </span>
-                                        ) : inv.ewayBillStatus === 'FAILED' && (
-                                            <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter">
-                                                Failed
-                                            </span>
-                                        )}
+            ) : (
+                <div className="space-y-6">
+                    {sortedLocations.map(location => (
+                        <div key={location} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in-up">
+                            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                        <MapPin className="h-5 w-5" />
                                     </div>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                        {inv.date ? format(new Date(inv.date), 'dd MMM yyyy') : (inv.createdAt?.seconds ? format(new Date(inv.createdAt.seconds * 1000), 'dd MMM yyyy') : '-')}
-                                    </p>
+                                    <div>
+                                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-tight">{location}</h3>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Inventory Location</p>
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-black text-blue-600 dark:text-blue-400">₹{(Number(inv.totalAmount) || 0).toFixed(0)}</div>
-                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-tighter">Basic: ₹{(Number(inv.subtotal) || 0).toFixed(0)}</div>
+                                <div className="flex items-center gap-3 self-end sm:self-auto">
+                                    <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2">
+                                        <FileText className="h-3 w-3" />
+                                        {groupedByLocation[location].length} Invoices
+                                    </div>
+                                    <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2">
+                                        Total: ₹{(groupedByLocation[location].reduce((acc, inv) => acc + (Number(inv.totalAmount) || 0), 0)).toLocaleString('en-IN')}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex justify-between items-center">
-                                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
-                                    {inv.customerName}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded uppercase tracking-tighter">
-                                        <MapPin className="h-3 w-3 text-blue-500" /> {inv.fromLocation || '-'}
-                                    </span>
-                                    {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
-                                        <div className="flex gap-1">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setView('edit'); }}
-                                                className="p-1.5 text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg transition-colors"
-                                            >
-                                                <Edit2 className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => handleDelete(e, inv)}
-                                                className="p-1.5 text-rose-600 bg-rose-50 dark:bg-rose-900/20 rounded-lg transition-colors"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
+                            <div className="hidden sm:block overflow-auto max-h-[600px] relative border-t border-slate-100">
+                                <table className="w-full text-left text-sm text-slate-600 min-w-[900px] border-separate border-spacing-0">
+                                    <thead className="sticky top-0 z-20 bg-slate-50 shadow-sm">
+                                        <tr className="text-slate-700 font-semibold uppercase text-[11px] tracking-wider">
+                                            <th className="px-6 py-4 border-b border-slate-100">Invoice No</th>
+                                            <th className="px-6 py-4 border-b border-slate-100">Date</th>
+                                            <th className="px-6 py-4 border-b border-slate-100">Customer</th>
+                                            <th className="px-6 py-4 border-b border-slate-100 text-right">Amount</th>
+                                            <th className="px-6 py-4 border-b border-slate-100 text-center">E-Way Bill</th>
+                                            <th className="px-6 py-4 border-b border-slate-100 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {daysToDisplay.map(day => {
+                                            const dayInvoices = groupedByLocation[location].filter(inv => {
+                                                const d = inv.date ? new Date(inv.date) : (inv.createdAt?.seconds ? new Date(inv.createdAt.seconds * 1000) : null);
+                                                return d && isSameDay(d, day);
+                                            });
+
+                                            if (dayInvoices.length === 0) {
+                                                return (
+                                                    <tr key={day.toISOString()} className="bg-slate-50/20">
+                                                        <td className="px-6 py-3 italic text-slate-400 font-medium text-[10px]" colSpan="6">
+                                                            <div className="flex items-center gap-2">
+                                                                <Calendar className="h-3 w-3" />
+                                                                {format(day, 'dd MMM yyyy')} - No Invoices
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }
+
+                                            return dayInvoices.map((inv) => (
+                                                <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                    <td className="px-6 py-4 font-mono font-medium text-slate-700">{inv.invoiceNo}</td>
+                                                    <td className="px-6 py-4 text-slate-500 whitespace-nowrap">
+                                                        {format(day, 'dd MMM yyyy')}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors truncate max-w-[200px]">{inv.customerName}</div>
+                                                            {inv.customerName?.toUpperCase() === 'CANCELED VOUCHER' && (
+                                                                <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter">
+                                                                    CANCELED
+                                                                </span>
+                                                            )}
+                                                            {inv.history && inv.history.length > 0 && (
+                                                                <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter flex items-center gap-1">
+                                                                    <Clock className="h-2 w-2" />
+                                                                    EDITED ({inv.history.length})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="text-slate-900 font-black">₹ {(Number(inv.totalAmount) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                                                        <div className="text-[10px] text-slate-400 font-bold">Base: ₹{(Number(inv.subtotal) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            {inv.ewayBillNo ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border border-emerald-200">
+                                                                        <CheckCircle className="h-2.5 w-2.5" /> Generated
+                                                                    </span>
+                                                                    <button
+                                                                        onClick={(e) => copyToClipboard(e, inv.ewayBillNo, inv.id)}
+                                                                        className="mt-1 flex items-center gap-1 text-[11px] font-mono text-slate-500 hover:text-blue-600 transition-colors"
+                                                                    >
+                                                                        {inv.ewayBillNo}
+                                                                        {copiedId === inv.id ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
+                                                                    </button>
+                                                                </div>
+                                                            ) : inv.ewayBillStatus === 'FAILED' ? (
+                                                                <div className="group relative flex flex-col items-center">
+                                                                    <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border border-rose-200">
+                                                                        <AlertTriangle className="h-2.5 w-2.5" /> Failed
+                                                                    </span>
+                                                                    <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl z-50 leading-tight">
+                                                                        {inv.tallyGspResponse?.error || 'Registration failed at NIC. Check HSN/GSTIN.'}
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex flex-col items-center gap-1.5 min-w-[140px]">
+                                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-tight">Manual Upload</span>
+                                                                    {userRole !== 'viewer' && (
+                                                                        <div className="flex flex-row gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <button
+                                                                                onClick={(e) => handleExportJSON(e, inv)}
+                                                                                disabled={generatingEway[inv.id]}
+                                                                                title="Export E-Invoice JSON"
+                                                                                className={`flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-amber-50 text-amber-600 hover:bg-amber-100 hover:shadow-amber-100/50 hover:scale-105 active:scale-95 ${generatingEway[inv.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                                            >
+                                                                                {generatingEway[inv.id] ? (
+                                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                                ) : (
+                                                                                    <Download className="h-4 w-4 fill-amber-500 text-amber-500" />
+                                                                                )}
+                                                                            </button>
+                                                                            <a
+                                                                                href="https://einvoice1.gst.gov.in/"
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                title="Go to E-Invoice Portal"
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                                className="flex items-center justify-center p-2 rounded-lg transition-all shadow-sm bg-blue-50 text-blue-700 hover:bg-blue-100 hover:shadow-blue-200 hover:scale-105 active:scale-95 no-underline border border-blue-100"
+                                                                            >
+                                                                                <ExternalLink className="h-4 w-4" />
+                                                                            </a>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex justify-end gap-1">
+                                                            {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => { setEditingInvoice(inv); setView('edit'); }}
+                                                                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-full transition-all hover:scale-110 active:scale-95"
+                                                                        title="Edit Invoice"
+                                                                    >
+                                                                        <Edit2 className="h-4 w-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => handleDelete(e, inv)}
+                                                                        className="p-2 text-rose-600 hover:bg-rose-50 rounded-full transition-all hover:scale-110 active:scale-95"
+                                                                        title="Delete Invoice"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                onClick={() => setSelectedInvoice(inv)}
+                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-all hover:scale-110 active:scale-95"
+                                                                title="View Invoice"
+                                                            >
+                                                                <FileText className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ));
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="sm:hidden grid grid-cols-1 divide-y divide-slate-100">
+                                {daysToDisplay.map(day => {
+                                    const dayInvoices = groupedByLocation[location].filter(inv => {
+                                        const d = inv.date ? new Date(inv.date) : (inv.createdAt?.seconds ? new Date(inv.createdAt.seconds * 1000) : null);
+                                        return d && isSameDay(d, day);
+                                    });
+
+                                    if (dayInvoices.length === 0) {
+                                        return (
+                                            <div key={day.toISOString()} className="p-3 bg-slate-50/20 text-slate-400 text-[10px] italic flex items-center gap-2">
+                                                <Calendar className="h-3 w-3" />
+                                                {format(day, 'dd MMM yyyy')} - No Invoices
+                                            </div>
+                                        );
+                                    }
+
+                                    return dayInvoices.map((inv) => (
+                                        <div
+                                            key={inv.id}
+                                            onClick={() => setSelectedInvoice(inv)}
+                                            className="p-4 bg-white active:bg-slate-50 transition-colors flex flex-col gap-3"
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono font-bold text-slate-900">{inv.invoiceNo}</span>
+                                                        {inv.ewayBillNo ? (
+                                                            <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter flex items-center gap-0.5">
+                                                                <Zap className="h-2 w-2 fill-emerald-500" /> E-WAY
+                                                            </span>
+                                                        ) : inv.ewayBillStatus === 'FAILED' && (
+                                                            <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter">
+                                                                Failed
+                                                            </span>
+                                                        )}
+                                                        {inv.history && inv.history.length > 0 && (
+                                                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter flex items-center gap-0.5">
+                                                                <Clock className="h-2 w-2" /> EDITED
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        {format(day, 'dd MMM yyyy')}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-sm font-black text-blue-600">₹{(Number(inv.totalAmount) || 0).toFixed(0)}</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Basic: ₹{(Number(inv.subtotal) || 0).toFixed(0)}</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center">
+                                                <div className="text-sm font-medium text-slate-700 truncate max-w-[200px]">
+                                                    {inv.customerName}
+                                                </div>
+                                                {userRole !== 'viewer' && (!settings?.invoice?.lockAfterDispatch) && (
+                                                    <div className="flex gap-1">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setView('edit'); }}
+                                                            className="p-1.5 text-amber-600 bg-amber-50 rounded-lg"
+                                                        >
+                                                            <Edit2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => handleDelete(e, inv)}
+                                                            className="p-1.5 text-rose-600 bg-rose-50 rounded-lg"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
+                                    ));
+                                })}
                             </div>
                         </div>
                     ))}
-                    {filteredInvoices.length === 0 && (
-                        <div className="p-8 text-center text-slate-400 dark:text-slate-500 text-sm">
-                            No invoices found.
-                        </div>
-                    )}
                 </div>
-            </div>
+            )}
 
             {selectedInvoice && (
                 <InvoiceViewModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
@@ -709,33 +804,43 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
     };
 
     const handleSubmit = async () => {
-        const validLines = lines.filter(l => l.productId && l.qty && parseFloat(String(l.qty).replace(/,/g, '.')) > 0);
+        const customerObj = customers.find(c => c.id === selectedCustomer);
+        const isCanceledVoucher = customerObj?.name?.toUpperCase() === 'CANCELED VOUCHER';
+
+        const validLines = lines.filter(l => {
+            const hasProduct = l.productId;
+            const qty = parseFloat(String(l.qty || 0).replace(/,/g, '.'));
+            return isCanceledVoucher ? hasProduct : (hasProduct && qty > 0);
+        });
 
         if (!invoiceNo || !selectedCustomer || !fromLocation || validLines.length === 0) {
-            alert("Please provide Invoice Number, Customer, Dispatch Location, and at least one valid Item.");
+            alert("Please provide Invoice Number, Customer, Dispatch Location, and at least one item.");
             return;
         }
 
         for (const line of validLines) {
             const qtyVal = Number(String(line.qty).replace(/,/g, '.'));
-            if (isNaN(qtyVal) || qtyVal <= 0) {
+            if (!isCanceledVoucher && (isNaN(qtyVal) || qtyVal <= 0)) {
                 alert(`Please enter a valid quantity greater than 0 for ${line.name || 'Selected Item'}`);
                 return;
             }
-            const prod = products.find(p => p.id === line.productId);
-            let globalStock = getStockAtLocation(prod);
 
-            // If editing, add back the quantity already "used" by this invoice for validation
-            if (invoice?.itemsSummary) {
-                const originalItem = invoice.itemsSummary.find(i => i.productId === line.productId);
-                if (originalItem) {
-                    globalStock += Number(originalItem.quantity);
+            // Only validate stock if NOT a canceled voucher
+            if (!isCanceledVoucher) {
+                const prod = products.find(p => p.id === line.productId);
+                let globalStock = getStockAtLocation(prod);
+
+                if (invoice?.itemsSummary) {
+                    const originalItem = invoice.itemsSummary.find(i => i.productId === line.productId);
+                    if (originalItem) {
+                        globalStock += Number(originalItem.quantity);
+                    }
                 }
-            }
 
-            if (globalStock < qtyVal) {
-                alert(`Insufficient global stock for ${line.name}. Available: ${globalStock.toFixed(1)}, Requested: ${qtyVal.toFixed(1)}`);
-                return;
+                if (globalStock < qtyVal) {
+                    alert(`Insufficient global stock for ${line.name}. Available: ${globalStock.toFixed(1)}, Requested: ${qtyVal.toFixed(1)}`);
+                    return;
+                }
             }
         }
 
@@ -874,19 +979,56 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                     </div>
                 </div>
                 <div className="space-y-1.5 p-1">
-                    <label className="text-slate-400 text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
-                        <User className="h-3 w-3 text-blue-500" /> Select Customer
-                    </label>
+                    <div className="flex justify-between items-center">
+                        <label className="text-slate-400 text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
+                            <User className="h-3 w-3 text-blue-500" /> Select Customer
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const canceledCustomer = customers.find(c => c.name.toUpperCase() === 'CANCELED VOUCHER');
+                                if (canceledCustomer) {
+                                    setSelectedCustomer(canceledCustomer.id);
+                                    setDistance('0');
+                                    setVehicleNumber('');
+                                    setVehicleError(false);
+                                    setTransport(prev => ({ ...prev, vehicleNumber: '', amount: '0' }));
+                                    setPerTonRate('0');
+                                    // Reset lines to 0 for ease of use
+                                    const firstProduct = products[0];
+                                    setLines([{
+                                        productId: firstProduct?.id || '',
+                                        name: firstProduct?.name || '',
+                                        qty: '0',
+                                        price: '0',
+                                        stock: firstProduct ? getStockAtLocation(firstProduct) : 0,
+                                        bags: '0',
+                                        bagWeight: '0',
+                                        purchaseOrderId: ''
+                                    }]);
+                                } else {
+                                    alert("Please create a customer named 'CANCELED VOUCHER' first.");
+                                }
+                            }}
+                            className="text-[9px] font-black text-rose-500 uppercase hover:text-rose-600 transition-colors"
+                        >
+                            Mark Canceled
+                        </button>
+                    </div>
                     <div className="relative">
                         <select
-                            className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-bold text-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer"
+                            className={`w-full hover:bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer ${selectedCustomer && customers.find(c => c.id === selectedCustomer)?.name.toUpperCase() === 'CANCELED VOUCHER' ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-900'}`}
                             value={selectedCustomer}
                             onChange={(e) => {
                                 const cId = e.target.value;
                                 setSelectedCustomer(cId);
                                 if (cId) {
-                                    // Trigger default distance logic when a valid customer (and thus pincode) is select
-                                    setDistance('100');
+                                    const cObj = customers.find(c => c.id === cId);
+                                    if (cObj?.name.toUpperCase() === 'CANCELED VOUCHER') {
+                                        setDistance('0');
+                                    } else {
+                                        setDistance('100');
+                                    }
                                 }
                             }}
                         >
@@ -1605,6 +1747,46 @@ function InvoiceViewModal({ invoice, onClose }) {
                             </div>
                         </div>
                     </div>
+
+                    {/* Edit History Section */}
+                    {invoice.history && invoice.history.length > 0 && (
+                        <div className="mt-12 pt-8 border-t border-slate-200 print:hidden">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Invoice Edit History
+                            </h3>
+                            <div className="space-y-4">
+                                {invoice.history.map((entry, idx) => (
+                                    <div key={idx} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase">
+                                                Revision {idx + 1} • {format(new Date(entry.updatedAt), 'dd MMM yyyy, h:mm a')}
+                                            </span>
+                                            <span className="text-[10px] bg-white px-2 py-1 rounded-md border border-slate-200 font-bold text-slate-600">
+                                                User ID: {entry.updatedBy?.slice(-6) || 'N/A'}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {entry.changes.map((change, cIdx) => (
+                                                <div key={cIdx} className="text-xs flex flex-col gap-1">
+                                                    <span className="font-bold text-slate-700 uppercase text-[9px] tracking-tight">{change.field}</span>
+                                                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100">
+                                                        <span className="text-rose-500 line-through opacity-60 truncate max-w-[150px]">
+                                                            {typeof change.old === 'object' ? 'Items Modified' : change.old}
+                                                        </span>
+                                                        <span className="text-slate-300">→</span>
+                                                        <span className="text-emerald-600 font-medium truncate max-w-[150px]">
+                                                            {typeof change.new === 'object' ? 'Updated' : change.new}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -1684,5 +1866,99 @@ function InvoiceItemsLoader({ invoiceId }) {
                 </tr>
             ))}
         </>
+    );
+}
+
+function InvoiceAuditLog({ invoices, onBack }) {
+    const allHistory = useMemo(() => {
+        return invoices
+            .filter(inv => inv.history && inv.history.length > 0)
+            .flatMap(inv => inv.history.map(entry => ({
+                ...entry,
+                invoiceNo: inv.invoiceNo,
+                customerName: inv.customerName,
+                invId: inv.id
+            })))
+            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    }, [invoices]);
+
+    return (
+        <div className="space-y-6 animate-fade-in-up">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={onBack}
+                        className="p-2 hover:bg-white rounded-full transition-colors border border-transparent hover:border-slate-200"
+                    >
+                        <ArrowLeft className="h-5 w-5 text-slate-600" />
+                    </button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                            <History className="h-6 w-6 text-indigo-600" />
+                            Global Edit History
+                        </h2>
+                        <p className="text-sm text-slate-500 mt-1">Audit trail for all invoice modifications</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
+                <div className="p-6">
+                    {allHistory.length === 0 ? (
+                        <div className="text-center py-20">
+                            <Clock className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                            <p className="text-slate-400 font-medium">No edit history found for recent invoices.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6 max-w-4xl mx-auto">
+                            {allHistory.map((entry, idx) => (
+                                <div key={idx} className="relative pl-8 pb-8 last:pb-0 border-l-2 border-slate-100 last:border-l-transparent">
+                                    <div className="absolute left-[-9px] top-0 h-4 w-4 rounded-full bg-indigo-500 border-4 border-white shadow-sm"></div>
+
+                                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm">
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Invoice #{entry.invoiceNo}</span>
+                                                    <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full uppercase">Edited</span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 font-bold flex items-center gap-1 leading-none">
+                                                    <User className="h-3 w-3" /> {entry.customerName}
+                                                </p>
+                                            </div>
+                                            <div className="text-left md:text-right">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Update Timestamp</p>
+                                                <p className="text-xs font-bold text-slate-700">{format(new Date(entry.updatedAt), 'dd MMM yyyy, h:mm a')}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-100">
+                                            {entry.changes.map((change, cIdx) => (
+                                                <div key={cIdx} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center text-xs">
+                                                    <span className="font-black text-slate-400 uppercase text-[9px] tracking-widest">{change.field}</span>
+                                                    <div className="md:col-span-2 flex items-center gap-3">
+                                                        <div className="flex-1 bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg border border-rose-100 line-through opacity-60 truncate">
+                                                            {typeof change.old === 'object' ? 'Items Modified' : change.old}
+                                                        </div>
+                                                        <ArrowLeft className="h-3 w-3 text-slate-300 rotate-180 shrink-0" />
+                                                        <div className="flex-1 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold truncate">
+                                                            {typeof change.new === 'object' ? 'Updated' : change.new}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-3 flex justify-end">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase italic">Modified by: {entry.updatedBy?.slice(-6) || 'System'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }

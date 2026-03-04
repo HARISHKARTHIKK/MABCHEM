@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { exportToCSV } from '../utils/exportToCSV';
-import { Plus, Search, Filter, Edit, Trash2, Package, Loader2 } from 'lucide-react';
+import { exportToExcel } from '../utils/exportToExcel';
+import { Plus, Search, Filter, Edit, Trash2, Package, Loader2, Download } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, where, limit, serverTimestamp } from 'firebase/firestore';
 import { addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -134,7 +134,7 @@ export default function Products() {
             'Stock Quantity': p.stockQty,
             'Low Stock Threshold': p.lowStockThreshold || 10
         }));
-        exportToCSV('products_export.csv', dataToExport);
+        exportToExcel('products_export.xlsx', dataToExport);
     };
 
     return (
@@ -152,7 +152,7 @@ export default function Products() {
                         onClick={handleExport}
                         className="flex items-center gap-2 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 px-4 py-2.5 rounded-lg font-medium transition-all shadow-sm active:scale-95"
                     >
-                        Export CSV
+                        Export Excel
                     </button>
                     {userRole !== 'viewer' && (
                         <button

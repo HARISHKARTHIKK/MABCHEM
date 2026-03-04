@@ -25,6 +25,8 @@ import { format } from 'date-fns';
 import { addImportEntry, addLocalPurchase } from '../services/firestoreService';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import { exportToExcel } from '../utils/exportToExcel';
+import { Download } from 'lucide-react';
 
 export default function StockManagement() {
     const { settings } = useSettings();
@@ -147,6 +149,21 @@ export default function StockManagement() {
 
     const availableLocations = (settings?.locations?.map(l => l.name) || ['CHENNAI', 'MUNDRA'])
         .filter(name => !['STORE FRONT', 'FACTORY'].includes(name.toUpperCase()));
+    const handleExport = () => {
+        const data = stockSummary.map(item => ({
+            'Product Name': item.name,
+            'Opening Stock': item.openingStock,
+            'Total In (Purchase)': item.totalIn,
+            'Total Out (Sales)': item.totalOut,
+            'Current Balance': item.balance,
+            ...Object.fromEntries(
+                Object.entries(item.locationDetails).flatMap(([loc, d]) => [
+                    [`${loc} Balance`, d.balance]
+                ])
+            )
+        }));
+        exportToExcel(data, `Stock_Inventory_Summary_${format(new Date(), 'dd_MM_yyyy')}`);
+    };
 
     return (
         <div className="space-y-6 animate-fade-in-up">
@@ -158,7 +175,13 @@ export default function StockManagement() {
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">Multi-location tracking & Supplier entries</p>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar items-center">
+                    <button
+                        onClick={handleExport}
+                        className="flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-xs border bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-500/20 active:scale-95"
+                    >
+                        <Download className="h-4 w-4" /> Export Excel
+                    </button>
                     <button
                         onClick={() => setActiveTab('dashboard')}
                         className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-xs border ${activeTab === 'dashboard' ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}

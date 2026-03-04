@@ -602,6 +602,48 @@ export const updateInvoice = async (invoiceId, updatedInvoice, updatedItems, fro
             });
         }
 
+        // 6. RECORD HISTORY / LOGS
+        const changes = [];
+        const fieldsToWatch = ['customerName', 'totalAmount', 'subtotal', 'taxRate', 'fromLocation', 'remarks'];
+        fieldsToWatch.forEach(field => {
+            if (JSON.stringify(oldInvoice[field]) !== JSON.stringify(updatedInvoice[field])) {
+                changes.push({
+                    field,
+                    old: oldInvoice[field] || 'N/A',
+                    new: updatedInvoice[field] || 'N/A'
+                });
+            }
+        });
+
+        // Compare items summary
+        const newItemsSummary = updatedItems.map(item => ({
+            productId: item.productId,
+            productName: item.name || item.productName || '',
+            quantity: Number(item.quantity),
+            price: Number(item.price),
+        }));
+
+        const oldItemsSummaryShort = (oldInvoice.itemsSummary || []).map(i => ({
+            productId: i.productId,
+            productName: i.productName,
+            quantity: i.quantity,
+            price: i.price
+        }));
+
+        if (JSON.stringify(oldItemsSummaryShort) !== JSON.stringify(newItemsSummary)) {
+            changes.push({
+                field: 'items',
+                old: oldInvoice.itemsSummary,
+                new: updatedItems
+            });
+        }
+
+        const historyEntry = {
+            updatedAt: new Date().toISOString(),
+            updatedBy: uid,
+            changes: changes
+        };
+
         // Update main Invoice document
         transaction.update(oldInvoiceRef, {
             ...updatedInvoice,
@@ -616,6 +658,7 @@ export const updateInvoice = async (invoiceId, updatedInvoice, updatedItems, fro
                 hsnCode: item.hsnCode || '',
                 purchaseOrderId: item.purchaseOrderId || null
             })),
+            history: [...(oldInvoice.history || []), historyEntry],
             updatedAt: serverTimestamp()
         });
     });

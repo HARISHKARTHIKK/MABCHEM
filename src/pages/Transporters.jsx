@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Truck, Loader2, Phone } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Truck, Loader2, Phone, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { addTransporter, updateTransporter, deleteTransporter } from '../services/firestoreService';
+import { exportToExcel } from '../utils/exportToExcel';
+import { format } from 'date-fns';
 
 export default function Transporters() {
     const { userRole } = useAuth();
@@ -93,6 +95,15 @@ export default function Transporters() {
         t.gstin?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const handleExport = () => {
+        const data = filteredTransporters.map(t => ({
+            'Transporter Name': t.name,
+            'GSTIN / Trans. ID': t.gstin || 'N/A',
+            'Phone Number': t.phone || 'N/A'
+        }));
+        exportToExcel(data, `Transporters_List_${format(new Date(), 'dd_MM_yyyy')}`);
+    };
+
     if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
     return (
@@ -105,15 +116,24 @@ export default function Transporters() {
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">Manage your transporter database</p>
                 </div>
-                {userRole !== 'viewer' && (
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
-                        onClick={() => handleOpenModal()}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 sm:py-2.5 rounded-lg font-medium transition-all shadow-md shadow-blue-500/20 active:scale-95"
+                        onClick={handleExport}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 sm:py-2.5 rounded-lg font-medium transition-all shadow-md shadow-emerald-500/20 active:scale-95 text-xs"
                     >
-                        <Plus className="h-4 w-4" />
-                        Add Transporter
+                        <Download className="h-4 w-4" />
+                        Export Excel
                     </button>
-                )}
+                    {userRole !== 'viewer' && (
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 sm:py-2.5 rounded-lg font-medium transition-all shadow-md shadow-blue-500/20 active:scale-95"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add Transporter
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
