@@ -515,6 +515,15 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
         isExtra: false
     });
 
+    const totalQty = lines.reduce((acc, line) => acc + (Number(String(line.qty || 0).replace(/,/g, '.')) || 0), 0);
+    const [perTonRate, setPerTonRate] = useState('');
+
+    useEffect(() => {
+        if (invoice?.transport?.amount && totalQty > 0) {
+            setPerTonRate((Number(invoice.transport.amount) / totalQty).toFixed(2));
+        }
+    }, [invoice, totalQty]);
+
     const validateVehicleNumber = (val) => {
         const regex = /^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$/;
         if (val && !regex.test(val)) {
@@ -843,7 +852,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
             </div>
 
             {/* Primary Details Bar - Lighter Professional Style */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                 <div className="space-y-1.5 p-1">
                     <label className="text-slate-400 text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
                         <MapPin className="h-3 w-3 text-blue-500" /> Dispatch Location
@@ -891,6 +900,27 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                         </div>
                     </div>
                 </div>
+                <div className="space-y-1.5 p-1">
+                    <label className="text-slate-400 text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
+                        Vehicle Number
+                    </label>
+                    <input
+                        type="text"
+                        className={`w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-bold text-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300 uppercase font-mono ${vehicleError ? 'animate-shake border-rose-500 ring-2 ring-rose-100' : ''}`}
+                        placeholder="TN 01 AB 1234"
+                        value={vehicleNumber}
+                        onChange={(e) => {
+                            setVehicleNumber(e.target.value.toUpperCase());
+                            if (vehicleError) setVehicleError(false);
+                        }}
+                        onBlur={(e) => validateVehicleNumber(e.target.value.toUpperCase())}
+                    />
+                    {vehicleError ? (
+                        <p className="text-[9px] text-rose-500 font-bold uppercase mt-1 leading-tight">Invalid format. Example: TN01AB1234</p>
+                    ) : (
+                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 italic leading-tight">Format: ST-00-AA-0000</p>
+                    )}
+                </div>
             </div>
 
             {selectedCustomer && purchaseOrders.filter(po => po.customerId === selectedCustomer).length > 0 && (
@@ -915,12 +945,13 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                 </div>
             )}
 
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            {/* E-Way Bill Details Hidden for now */}
+            <div className="hidden bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="h-6 w-1 bg-blue-600 rounded-full"></div>
                     <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs">E-Way Bill Details</h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1.5">
                         <label className="text-slate-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
                             <MapPin className="h-3 w-3 text-blue-500" /> Destination Pincode
@@ -962,27 +993,6 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                         <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 italic leading-tight">Auto-fills to 100km</p>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-slate-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
-                            Vehicle Number
-                        </label>
-                        <input
-                            type="text"
-                            className={`w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-bold text-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300 uppercase font-mono ${vehicleError ? 'animate-shake border-rose-500 ring-2 ring-rose-100' : ''}`}
-                            placeholder="TN 01 AB 1234"
-                            value={vehicleNumber}
-                            onChange={(e) => {
-                                setVehicleNumber(e.target.value.toUpperCase());
-                                if (vehicleError) setVehicleError(false);
-                            }}
-                            onBlur={(e) => validateVehicleNumber(e.target.value.toUpperCase())}
-                        />
-                        {vehicleError ? (
-                            <p className="text-[9px] text-rose-500 font-bold uppercase mt-1 leading-tight">Invalid format. Example: TN01AB1234</p>
-                        ) : (
-                            <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 italic leading-tight">Format: ST-00-AA-0000</p>
-                        )}
-                    </div>
                 </div>
             </div>
 
@@ -1286,7 +1296,15 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                     )}
                                 </div>
                                 <div>
-                                    {/* Vehicle number moved to E-way Bill section */}
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Pricing</label>
+                                    <select
+                                        className="w-full bg-slate-50 border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                                        value={transport.isExtra ? 'Extra' : 'Included'}
+                                        onChange={e => setTransport({ ...transport, isExtra: e.target.value === 'Extra' })}
+                                    >
+                                        <option value="Included">Included</option>
+                                        <option value="Extra">Extra Cost</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -1299,9 +1317,33 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                             type="number"
                                             className="w-full bg-slate-50 border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                                             value={transport.amount}
-                                            onChange={e => setTransport({ ...transport, amount: e.target.value })}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                setTransport({ ...transport, amount: val });
+                                                if (totalQty > 0) {
+                                                    setPerTonRate((Number(val) / totalQty).toFixed(2));
+                                                }
+                                            }}
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Rate / Ton (₹)</label>
+                                        <input
+                                            type="number"
+                                            className="w-full bg-slate-50 border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                            placeholder="Rate per MTS"
+                                            value={perTonRate}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                setPerTonRate(val);
+                                                if (totalQty > 0) {
+                                                    setTransport({ ...transport, amount: (Number(val) * totalQty).toFixed(2) });
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Payment Type</label>
                                         <select
@@ -1320,8 +1362,6 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                             <option value="To Pay">To Pay</option>
                                         </select>
                                     </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Method</label>
                                         <select
@@ -1333,17 +1373,6 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                             {(settings?.transport?.modes || ['By Road', 'By Sea', 'By Air']).map(m => (
                                                 <option key={m} value={m}>{m}</option>
                                             ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Pricing</label>
-                                        <select
-                                            className="w-full bg-slate-50 border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                                            value={transport.isExtra ? 'Extra' : 'Included'}
-                                            onChange={e => setTransport({ ...transport, isExtra: e.target.value === 'Extra' })}
-                                        >
-                                            <option value="Included">Included</option>
-                                            <option value="Extra">Extra Cost</option>
                                         </select>
                                     </div>
                                 </div>
