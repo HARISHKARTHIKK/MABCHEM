@@ -207,7 +207,7 @@ export default function RecycleBin() {
                                             {item.type === 'INVOICE' && (
                                                 <div className="space-y-1">
                                                     <div className="font-bold text-slate-800 dark:text-slate-100">#{item.data.invoiceNo} - {item.data.customerName}</div>
-                                                    <div className="text-xs text-slate-500">Amount: ₹{item.data.totalAmount?.toLocaleString()} | Items: {item.data.items?.length || 0}</div>
+                                                    <div className="text-xs text-slate-500">Amount: ₹{item.data.totalAmount?.toLocaleString('en-IN')} | Items: {item.data.items?.length || 0}</div>
                                                 </div>
                                             )}
                                         </div>

@@ -207,7 +207,7 @@ export default function Products() {
                                             <span className="text-xs text-slate-400">HSN: {product.hsn}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 font-medium text-slate-900">₹ {Number(product.price).toLocaleString()}</td>
+                                    <td className="px-6 py-4 font-medium text-slate-900">₹ {Number(product.price).toLocaleString('en-IN')}</td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${product.stockQty === 0 ? 'bg-slate-100 text-slate-600' :
                                             product.stockQty < (product.lowStockThreshold || 10) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'

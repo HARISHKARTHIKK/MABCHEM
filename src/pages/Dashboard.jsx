@@ -465,7 +465,7 @@ export default function Dashboard() {
                             {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter">{loc}</span>
-                                    <span className="text-sm font-black text-slate-700 dark:text-slate-200">{(monthlySummary[loc]?.opening || 0).toLocaleString()}</span>
+                                    <span className="text-sm font-black text-slate-700 dark:text-slate-200">{(monthlySummary[loc]?.opening || 0).toLocaleString('en-IN')}</span>
                                 </div>
                             ))}
                         </div>
@@ -474,7 +474,7 @@ export default function Dashboard() {
                                 {Object.keys(monthlySummary)
                                     .filter(k => k !== 'lastUpdated')
                                     .reduce((sum, loc) => sum + (monthlySummary[loc]?.opening || 0), 0)
-                                    .toLocaleString()}
+                                    .toLocaleString('en-IN')}
                             </span>
                             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
@@ -490,7 +490,7 @@ export default function Dashboard() {
                             {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-900/10 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-tighter">{loc}</span>
-                                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">+{(monthlySummary[loc]?.inward || 0).toLocaleString()}</span>
+                                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">+{(monthlySummary[loc]?.inward || 0).toLocaleString('en-IN')}</span>
                                 </div>
                             ))}
                         </div>
@@ -499,7 +499,7 @@ export default function Dashboard() {
                                 {Object.keys(monthlySummary)
                                     .filter(k => k !== 'lastUpdated')
                                     .reduce((sum, loc) => sum + (monthlySummary[loc]?.inward || 0), 0)
-                                    .toLocaleString()}
+                                    .toLocaleString('en-IN')}
                             </span>
                             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
@@ -515,7 +515,7 @@ export default function Dashboard() {
                             {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-rose-50/30 dark:bg-rose-900/10 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-tighter">{loc}</span>
-                                    <span className="text-sm font-black text-rose-600 dark:text-rose-400">-{(monthlySummary[loc]?.dispatch || 0).toLocaleString()}</span>
+                                    <span className="text-sm font-black text-rose-600 dark:text-rose-400">-{(monthlySummary[loc]?.dispatch || 0).toLocaleString('en-IN')}</span>
                                 </div>
                             ))}
                         </div>
@@ -524,7 +524,7 @@ export default function Dashboard() {
                                 {Object.keys(monthlySummary)
                                     .filter(k => k !== 'lastUpdated')
                                     .reduce((sum, loc) => sum + (monthlySummary[loc]?.dispatch || 0), 0)
-                                    .toLocaleString()}
+                                    .toLocaleString('en-IN')}
                             </span>
                             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
@@ -540,7 +540,7 @@ export default function Dashboard() {
                             {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-blue-500 uppercase tracking-tighter">{loc}</span>
-                                    <span className="text-sm font-black text-blue-700 dark:text-blue-300">{(monthlySummary[loc]?.net || 0).toLocaleString()}</span>
+                                    <span className="text-sm font-black text-blue-700 dark:text-blue-300">{(monthlySummary[loc]?.net || 0).toLocaleString('en-IN')}</span>
                                 </div>
                             ))}
                         </div>
@@ -549,7 +549,7 @@ export default function Dashboard() {
                                 {Object.keys(monthlySummary)
                                     .filter(k => k !== 'lastUpdated')
                                     .reduce((sum, loc) => sum + (monthlySummary[loc]?.net || 0), 0)
-                                    .toLocaleString()}
+                                    .toLocaleString('en-IN')}
                             </span>
                             <span className="text-[10px] text-blue-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>

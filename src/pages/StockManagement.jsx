@@ -722,7 +722,7 @@ function ImportForm({ products, suppliers, transporters, settings, locations, on
                                             readOnly
                                             tabIndex="-1"
                                             className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-blue-600 dark:text-blue-400 cursor-not-allowed outline-none"
-                                            value={`₹${totals.balanceFreight.toLocaleString()}`}
+                                            value={`₹${totals.balanceFreight.toLocaleString('en-IN')}`}
                                         />
                                     </div>
                                     <div>
@@ -826,7 +826,7 @@ function ImportForm({ products, suppliers, transporters, settings, locations, on
                             readOnly
                             tabIndex="-1"
                             className="bg-transparent border-none text-2xl font-black text-slate-900 dark:text-white outline-none cursor-not-allowed"
-                            value={`${formData.currency} ${totals.totalPrice.toLocaleString()}`}
+                            value={`${formData.currency} ${totals.totalPrice.toLocaleString('en-IN')}`}
                         />
                     </div>
                     <button type="submit" disabled={isSaving} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs disabled:opacity-50">
@@ -1069,7 +1069,7 @@ function LocalPurchaseForm({ products, suppliers, transporters, settings, locati
                                             readOnly
                                             tabIndex="-1"
                                             className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-blue-600 dark:text-blue-400 cursor-not-allowed outline-none"
-                                            value={`₹${totals.balanceFreight.toLocaleString()}`}
+                                            value={`₹${totals.balanceFreight.toLocaleString('en-IN')}`}
                                         />
                                     </div>
                                     <div>
@@ -1174,7 +1174,7 @@ function LocalPurchaseForm({ products, suppliers, transporters, settings, locati
                                 readOnly
                                 tabIndex="-1"
                                 className="bg-transparent border-none text-2xl font-black text-slate-900 dark:text-white outline-none cursor-not-allowed"
-                                value={`INR ${totals.totalPrice.toLocaleString()}`}
+                                value={`INR ${totals.totalPrice.toLocaleString('en-IN')}`}
                             />
                         </div>
                         <label className="flex items-center gap-3 cursor-pointer select-none border-l border-slate-200 pl-6">
