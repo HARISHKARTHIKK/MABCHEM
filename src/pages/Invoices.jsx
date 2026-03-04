@@ -42,7 +42,7 @@ export default function Invoices() {
 
     // Real-time invoices fetch
     useEffect(() => {
-        const q = query(collection(db, 'invoices'), orderBy('createdAt', 'desc'), limit(100));
+        const q = query(collection(db, 'invoices'), orderBy('createdAt', 'desc'), limit(1000));
 
         try {
             const unsubscribe = onSnapshot(q, (snapshot) => {

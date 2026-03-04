@@ -32,7 +32,7 @@ export default function Products() {
             collection(db, 'products'),
             // where('userId', '==', currentUser.uid), // Temporarily disabled to show all products
             orderBy('createdAt', 'desc'),
-            limit(50)
+            limit(500)
         );
 
         const unsubscribe = onSnapshot(

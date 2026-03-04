@@ -14,7 +14,7 @@ export default function Dispatch() {
 
     useEffect(() => {
         // Query dispatches
-        const q = query(collection(db, 'dispatches'), orderBy('createdAt', 'desc'), limit(200));
+        const q = query(collection(db, 'dispatches'), orderBy('createdAt', 'desc'), limit(1000));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -36,7 +36,7 @@ export default function Dispatch() {
                 (d.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (d.location || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-            const dispDate = d.createdAt?.seconds ? new Date(d.createdAt.seconds * 1000) : null;
+            const dispDate = d.createdAt?.seconds ? new Date(d.createdAt.seconds * 1000) : (d.date ? new Date(d.date) : null);
             let matchesDate = true;
 
             if (dispDate) {

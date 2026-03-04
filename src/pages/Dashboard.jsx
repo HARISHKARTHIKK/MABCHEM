@@ -22,6 +22,7 @@ export default function Dashboard() {
     const [allDispatches, setAllDispatches] = useState([]);
     const [allImports, setAllImports] = useState([]);
     const [allPurchases, setAllPurchases] = useState([]);
+    const [allMovements, setAllMovements] = useState([]);
     const [stockSnapshots, setStockSnapshots] = useState([]);
     const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [isSyncing, setIsSyncing] = useState(false);
@@ -63,6 +64,10 @@ export default function Dashboard() {
         const unsubSnapshots = onSnapshot(collection(db, 'stockSnapshots'), (snap) => {
             setStockSnapshots(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+
+        const unsubMovements = onSnapshot(collection(db, 'stockMovements'), (snap) => {
+            setAllMovements(snap.docs.map(d => ({ id: d.id, type: 'MOVEMENT', ...d.data() })));
+        });
         // ---------------------------------------------------------
 
         const unsubDispatches = onSnapshot(qDispatches, (snap) => {
@@ -95,6 +100,7 @@ export default function Dashboard() {
             unsubAllImports();
             unsubAllPurchases();
             unsubSnapshots();
+            unsubMovements();
             unsubDispatches();
             unsubImports();
             unsubPurchases();
@@ -152,29 +158,38 @@ export default function Dashboard() {
             }, 0);
 
             // Group all logs by month to facilitate backward calculation
-            const allLogsLoc = [...allImports, ...allPurchases, ...allDispatches]
-                .filter(l => l.location === locName)
+            const allLogsLoc = [...allImports, ...allPurchases, ...allDispatches, ...allMovements]
+                .filter(l => l.location === locName || (l.type === 'MOVEMENT' && l.location === locName))
                 .map(item => ({
                     ...item,
                     _date: parseDate(item),
-                    _isInward: !item.invoiceNo || (item.type === 'IMPORT' || item.type === 'LOCAL')
+                    _isInward: (item.type === 'IMPORT' || item.type === 'LOCAL') ||
+                        (item.type === 'MOVEMENT' && (Number(item.changeQty) || 0) > 0) ||
+                        (!item.invoiceNo && item.type !== 'DISPATCH' && item.type !== 'MOVEMENT')
                 }));
 
             // Calculate stats for the SELECTED month specifically for this location
             const inward = allLogsLoc
                 .filter(l => l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
-                .reduce((sum, l) => sum + getQty(l), 0);
+                .reduce((sum, l) => {
+                    const qty = (l.type === 'MOVEMENT') ? Math.abs(Number(l.changeQty) || 0) : getQty(l);
+                    return sum + qty;
+                }, 0);
 
             const dispatch = allLogsLoc
                 .filter(l => !l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
-                .reduce((sum, l) => sum + getQty(l), 0);
+                .reduce((sum, l) => {
+                    const qty = (l.type === 'MOVEMENT') ? Math.abs(Number(l.changeQty) || 0) : getQty(l);
+                    return sum + qty;
+                }, 0);
 
             // Backward calculation for Opening Stock
             let netAtEndOfSelected = currentStockLoc;
             if (!isCurrentMonth && startOfSelected < startOfMonth(now)) {
                 const logsAfterSelected = allLogsLoc.filter(l => l._date > endOfSelected);
                 const netChangeSinceSelected = logsAfterSelected.reduce((sum, l) => {
-                    return sum + (l._isInward ? getQty(l) : -getQty(l));
+                    const qty = (l.type === 'MOVEMENT') ? (Number(l.changeQty) || 0) : (l._isInward ? getQty(l) : -getQty(l));
+                    return sum + (l.type === 'MOVEMENT' ? qty : (l._isInward ? getQty(l) : -getQty(l)));
                 }, 0);
                 netAtEndOfSelected = currentStockLoc - netChangeSinceSelected;
             }
@@ -189,12 +204,17 @@ export default function Dashboard() {
             };
         };
 
-        return {
-            CHENNAI: computeStatsForLocation('CHENNAI'),
-            MUNDRA: computeStatsForLocation('MUNDRA'),
-            lastUpdated: new Date()
-        };
-    }, [products, allImports, allPurchases, allDispatches, stockSnapshots, selectedMonth]);
+        const locations = (settings?.locations?.length > 0)
+            ? settings.locations.map(l => l.name)
+            : ['CHENNAI', 'MUNDRA'];
+
+        const summary = { lastUpdated: new Date() };
+        locations.forEach(loc => {
+            summary[loc] = computeStatsForLocation(loc);
+        });
+
+        return summary;
+    }, [products, allImports, allPurchases, allDispatches, allMovements, stockSnapshots, selectedMonth, settings]);
 
     const productStats = useMemo(() => {
         const now = new Date();
@@ -212,31 +232,44 @@ export default function Dashboard() {
             return new Date(0);
         };
 
+        const locations = (settings?.locations?.length > 0)
+            ? settings.locations.map(l => l.name)
+            : ['CHENNAI', 'MUNDRA'];
+
         const stats = {};
         products.forEach(p => {
             stats[p.id] = {};
-            ['CHENNAI', 'MUNDRA'].forEach(loc => {
+            locations.forEach(loc => {
                 const currentStock = Number(p.locations?.[loc]) || 0;
-                const prodLogs = [...allImports, ...allPurchases, ...allDispatches]
-                    .filter(l => l.productId === p.id && l.location === loc)
+                const prodLogs = [...allImports, ...allPurchases, ...allDispatches, ...allMovements]
+                    .filter(l => l.productId === p.id && (l.location === loc || (l.type === 'MOVEMENT' && l.location === loc)))
                     .map(item => ({
                         ...item,
                         _date: parseDate(item),
-                        _isInward: !item.invoiceNo || (item.type === 'IMPORT' || item.type === 'LOCAL')
+                        _isInward: (item.type === 'IMPORT' || item.type === 'LOCAL') ||
+                            (item.type === 'MOVEMENT' && (Number(item.changeQty) || 0) > 0) ||
+                            (!item.invoiceNo && item.type !== 'DISPATCH' && item.type !== 'MOVEMENT')
                     }));
 
                 const inward = prodLogs
                     .filter(l => l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
-                    .reduce((sum, l) => sum + getQty(l), 0);
+                    .reduce((sum, l) => {
+                        const qty = (l.type === 'MOVEMENT') ? Math.abs(Number(l.changeQty) || 0) : getQty(l);
+                        return sum + qty;
+                    }, 0);
                 const dispatch = prodLogs
                     .filter(l => !l._isInward && l._date >= startOfSelected && l._date <= endOfSelected)
-                    .reduce((sum, l) => sum + getQty(l), 0);
+                    .reduce((sum, l) => {
+                        const qty = (l.type === 'MOVEMENT') ? Math.abs(Number(l.changeQty) || 0) : getQty(l);
+                        return sum + qty;
+                    }, 0);
 
                 let netAtEndOfSelected = currentStock;
                 if (!isCurrentMonth && startOfSelected < startOfMonth(now)) {
                     const logsAfterSelected = prodLogs.filter(l => l._date > endOfSelected);
                     const netChangeSinceSelected = logsAfterSelected.reduce((sum, l) => {
-                        return sum + (l._isInward ? getQty(l) : -getQty(l));
+                        const qty = (l.type === 'MOVEMENT') ? (Number(l.changeQty) || 0) : (l._isInward ? getQty(l) : -getQty(l));
+                        return sum + qty;
                     }, 0);
                     netAtEndOfSelected = currentStock - netChangeSinceSelected;
                 }
@@ -250,7 +283,7 @@ export default function Dashboard() {
             });
         });
         return stats;
-    }, [products, allImports, allPurchases, allDispatches, selectedMonth]);
+    }, [products, allImports, allPurchases, allDispatches, allMovements, selectedMonth, settings]);
 
     const handleOpenStockModal = (product) => {
         setSelectedProduct(product);
@@ -334,7 +367,10 @@ export default function Dashboard() {
                                     <div className="mb-2 space-y-1">
                                         {hasLocations && Object.entries(p.locations)
                                             .sort(([a], [b]) => {
-                                                const order = { 'CHENNAI': 1, 'MUNDRA': 2 };
+                                                const order = {};
+                                                (settings?.locations || []).forEach((l, i) => {
+                                                    order[l.name.toUpperCase()] = i + 1;
+                                                });
                                                 const valA = order[a.toUpperCase()] || 99;
                                                 const valB = order[b.toUpperCase()] || 99;
                                                 return valA - valB || a.localeCompare(b);
@@ -426,7 +462,7 @@ export default function Dashboard() {
                             <Box className="h-3.5 w-3.5 text-slate-300" />
                         </div>
                         <div className="space-y-1 mb-2">
-                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                            {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-slate-700 dark:text-slate-200">{(monthlySummary[loc]?.opening || 0).toLocaleString()}</span>
@@ -434,7 +470,12 @@ export default function Dashboard() {
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
-                            <span className="text-[14px] font-bold text-slate-500">{(monthlySummary.CHENNAI.opening + monthlySummary.MUNDRA.opening).toLocaleString()}</span>
+                            <span className="text-[14px] font-bold text-slate-500">
+                                {Object.keys(monthlySummary)
+                                    .filter(k => k !== 'lastUpdated')
+                                    .reduce((sum, loc) => sum + (monthlySummary[loc]?.opening || 0), 0)
+                                    .toLocaleString()}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
@@ -446,7 +487,7 @@ export default function Dashboard() {
                             <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
                         </div>
                         <div className="space-y-1 mb-2">
-                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                            {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-900/10 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">+{(monthlySummary[loc]?.inward || 0).toLocaleString()}</span>
@@ -454,7 +495,12 @@ export default function Dashboard() {
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
-                            <span className="text-[14px] font-bold text-emerald-600">{(monthlySummary.CHENNAI.inward + monthlySummary.MUNDRA.inward).toLocaleString()}</span>
+                            <span className="text-[14px] font-bold text-emerald-600">
+                                {Object.keys(monthlySummary)
+                                    .filter(k => k !== 'lastUpdated')
+                                    .reduce((sum, loc) => sum + (monthlySummary[loc]?.inward || 0), 0)
+                                    .toLocaleString()}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
@@ -466,7 +512,7 @@ export default function Dashboard() {
                             <ArrowDownRight className="h-3.5 w-3.5 text-rose-500" />
                         </div>
                         <div className="space-y-1 mb-2">
-                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                            {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-rose-50/30 dark:bg-rose-900/10 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-rose-600 dark:text-rose-400">-{(monthlySummary[loc]?.dispatch || 0).toLocaleString()}</span>
@@ -474,7 +520,12 @@ export default function Dashboard() {
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-slate-50 dark:border-slate-700/50 pt-1">
-                            <span className="text-[14px] font-bold text-rose-600">{(monthlySummary.CHENNAI.dispatch + monthlySummary.MUNDRA.dispatch).toLocaleString()}</span>
+                            <span className="text-[14px] font-bold text-rose-600">
+                                {Object.keys(monthlySummary)
+                                    .filter(k => k !== 'lastUpdated')
+                                    .reduce((sum, loc) => sum + (monthlySummary[loc]?.dispatch || 0), 0)
+                                    .toLocaleString()}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>
@@ -486,7 +537,7 @@ export default function Dashboard() {
                             <Package className="h-3.5 w-3.5 text-blue-500" />
                         </div>
                         <div className="space-y-1 mb-2">
-                            {['CHENNAI', 'MUNDRA'].map(loc => (
+                            {Object.keys(monthlySummary).filter(k => k !== 'lastUpdated').map(loc => (
                                 <div key={loc} className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
                                     <span className="text-[10px] font-extrabold text-blue-500 uppercase tracking-tighter">{loc}</span>
                                     <span className="text-sm font-black text-blue-700 dark:text-blue-300">{(monthlySummary[loc]?.net || 0).toLocaleString()}</span>
@@ -494,7 +545,12 @@ export default function Dashboard() {
                             ))}
                         </div>
                         <div className="flex items-baseline gap-1 border-t border-blue-200 dark:border-blue-800 pt-1">
-                            <span className="text-[14px] font-bold text-blue-700">{(monthlySummary.CHENNAI.net + monthlySummary.MUNDRA.net).toLocaleString()}</span>
+                            <span className="text-[14px] font-bold text-blue-700">
+                                {Object.keys(monthlySummary)
+                                    .filter(k => k !== 'lastUpdated')
+                                    .reduce((sum, loc) => sum + (monthlySummary[loc]?.net || 0), 0)
+                                    .toLocaleString()}
+                            </span>
                             <span className="text-[10px] text-blue-400 font-medium uppercase tracking-tighter">Total</span>
                         </div>
                     </div>

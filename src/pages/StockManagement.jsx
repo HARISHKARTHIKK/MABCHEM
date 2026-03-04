@@ -38,6 +38,7 @@ export default function StockManagement() {
     const [suppliers, setSuppliers] = useState([]);
     const [transporters, setTransporters] = useState([]);
     const [invoices, setInvoices] = useState([]);
+    const [movements, setMovements] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -63,6 +64,10 @@ export default function StockManagement() {
 
         const unsubInvoices = onSnapshot(collection(db, 'invoices'), (snap) => {
             setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
+        const unsubMovements = onSnapshot(collection(db, 'stockMovements'), (snap) => {
+            setMovements(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
         });
 
@@ -73,6 +78,7 @@ export default function StockManagement() {
             unsubSuppliers();
             unsubTransporters();
             unsubInvoices();
+            unsubMovements();
         };
     }, []);
 
@@ -85,9 +91,12 @@ export default function StockManagement() {
         return products.map(p => {
             const prodImports = imports.filter(i => i.productId === p.id);
             const prodLocal = localPurchases.filter(l => l.productId === p.id);
+            const prodMovements = movements.filter(m => m.productId === p.id);
 
             const totalImports = prodImports.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
             const totalLocal = prodLocal.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+            const totalMovesIn = prodMovements.filter(m => (Number(m.changeQty) || 0) > 0).reduce((sum, m) => sum + (Number(m.changeQty) || 0), 0);
+            const totalMovesOut = prodMovements.filter(m => (Number(m.changeQty) || 0) < 0).reduce((sum, m) => sum + Math.abs(Number(m.changeQty) || 0), 0);
 
             let totalOut = 0;
             invoices.forEach(inv => {
@@ -99,13 +108,15 @@ export default function StockManagement() {
             });
 
             const currentBalance = Number(p.stockQty) || 0;
-            const openingStock = currentBalance - ((totalImports + totalLocal) - totalOut);
+            const openingStock = currentBalance - ((totalImports + totalLocal + totalMovesIn) - (totalOut + totalMovesOut));
 
             // Per Location Breakdown
             const locDetails = {};
             locationNames.forEach(locName => {
                 const locInImports = prodImports.filter(i => i.location === locName).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
                 const locInLocal = prodLocal.filter(l => l.location === locName).reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+                const locMovesIn = prodMovements.filter(m => m.location === locName && (Number(m.changeQty) || 0) > 0).reduce((sum, m) => sum + (Number(m.changeQty) || 0), 0);
+                const locMovesOut = prodMovements.filter(m => m.location === locName && (Number(m.changeQty) || 0) < 0).reduce((sum, m) => sum + Math.abs(Number(m.changeQty) || 0), 0);
 
                 let locOut = 0;
                 invoices.filter(inv => inv.fromLocation === locName).forEach(inv => {
@@ -117,8 +128,8 @@ export default function StockManagement() {
                 });
 
                 locDetails[locName] = {
-                    in: Number((locInImports + locInLocal).toFixed(1)),
-                    out: Number(locOut.toFixed(1)),
+                    in: Number((locInImports + locInLocal + locMovesIn).toFixed(1)),
+                    out: Number((locOut + locMovesOut).toFixed(1)),
                     balance: Number((p.locations?.[locName] || 0).toFixed(1))
                 };
             });
@@ -127,17 +138,21 @@ export default function StockManagement() {
                 id: p.id,
                 name: p.name,
                 openingStock: Number(openingStock.toFixed(1)),
-                totalIn: Number((totalImports + totalLocal).toFixed(1)),
-                totalOut: Number(totalOut.toFixed(1)),
+                totalIn: Number((totalImports + totalLocal + totalMovesIn).toFixed(1)),
+                totalOut: Number((totalOut + totalMovesOut).toFixed(1)),
                 balance: Number(currentBalance.toFixed(1)),
-                lowStock: currentBalance < 10,
+                lowStock: currentBalance < (p.lowStockThreshold || 10),
                 locationDetails: locDetails,
-                recentTransactions: [...prodImports, ...prodLocal]
-                    .sort((a, b) => b.date.localeCompare(a.date)) // Fallback to date sorting if createdAt not yet synced
+                recentTransactions: [...prodImports, ...prodLocal, ...prodMovements]
+                    .sort((a, b) => {
+                        const dateA = a.date || a.createdAt?.toDate()?.toISOString() || '';
+                        const dateB = b.date || b.createdAt?.toDate()?.toISOString() || '';
+                        return dateB.localeCompare(dateA);
+                    })
                     .slice(0, 5)
             };
         }).sort((a, b) => a.name.localeCompare(b.name));
-    }, [products, imports, localPurchases, invoices, settings]);
+    }, [products, imports, localPurchases, invoices, movements, settings]);
 
     const stats = useMemo(() => {
         const totalUnits = products.reduce((sum, p) => sum + (Number(p.stockQty) || 0), 0);
