@@ -21,7 +21,7 @@ import {
     History,
     CreditCard
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { addImportEntry, addLocalPurchase } from '../services/firestoreService';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,10 @@ export default function StockManagement() {
     const [invoices, setInvoices] = useState([]);
     const [movements, setMovements] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [dateFilter, setDateFilter] = useState({
+        start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+        end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
+    });
 
     useEffect(() => {
         const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
@@ -88,38 +92,82 @@ export default function StockManagement() {
             !['STORE FRONT', 'FACTORY'].includes(name.toUpperCase())
         );
 
+        const startDate = startOfDay(new Date(dateFilter.start));
+        const endDate = endOfDay(new Date(dateFilter.end));
+
         return products.map(p => {
             const prodImports = imports.filter(i => i.productId === p.id);
             const prodLocal = localPurchases.filter(l => l.productId === p.id);
             const prodMovements = movements.filter(m => m.productId === p.id);
 
-            const totalImports = prodImports.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-            const totalLocal = prodLocal.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
-            const totalMovesIn = prodMovements.filter(m => (Number(m.changeQty) || 0) > 0).reduce((sum, m) => sum + (Number(m.changeQty) || 0), 0);
-            const totalMovesOut = prodMovements.filter(m => (Number(m.changeQty) || 0) < 0).reduce((sum, m) => sum + Math.abs(Number(m.changeQty) || 0), 0);
+            // Filter transactions by date range
+            const filteredImports = prodImports.filter(i => isWithinInterval(new Date(i.date), { start: startDate, end: endDate }));
+            const filteredLocal = prodLocal.filter(l => isWithinInterval(new Date(l.date), { start: startDate, end: endDate }));
+            const filteredMovements = prodMovements.filter(m => {
+                const d = m.date ? new Date(m.date) : m.createdAt?.toDate();
+                return d && isWithinInterval(d, { start: startDate, end: endDate });
+            });
 
-            let totalOut = 0;
-            invoices.forEach(inv => {
+            const totalImportsInRange = filteredImports.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+            const totalLocalInRange = filteredLocal.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+            const totalMovesInInRange = filteredMovements.filter(m => (Number(m.changeQty) || 0) > 0).reduce((sum, m) => sum + (Number(m.changeQty) || 0), 0);
+            const totalMovesOutInRange = filteredMovements.filter(m => (Number(m.changeQty) || 0) < 0).reduce((sum, m) => sum + Math.abs(Number(m.changeQty) || 0), 0);
+
+            // Calculate total out from invoices within range
+            let totalOutInRange = 0;
+            invoices.filter(inv => {
+                const d = inv.createdAt?.toDate();
+                return d && isWithinInterval(d, { start: startDate, end: endDate });
+            }).forEach(inv => {
                 (inv.itemsSummary || []).forEach(item => {
                     if (item.productId === p.id || (!item.productId && item.productName === p.name)) {
-                        totalOut += Number(item.quantity) || 0;
+                        totalOutInRange += Number(item.quantity) || 0;
+                    }
+                });
+            });
+
+            // For Opening Stock (Balance before startDate)
+            const allImportsAfterStart = prodImports.filter(i => new Date(i.date) >= startDate).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+            const allLocalAfterStart = prodLocal.filter(l => new Date(l.date) >= startDate).reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+            const allMovementsInAfterStart = prodMovements.filter(m => {
+                const d = m.date ? new Date(m.date) : m.createdAt?.toDate();
+                return d && d >= startDate && (Number(m.changeQty) || 0) > 0;
+            }).reduce((sum, m) => sum + (Number(m.changeQty) || 0), 0);
+
+            const allMovementsOutAfterStart = prodMovements.filter(m => {
+                const d = m.date ? new Date(m.date) : m.createdAt?.toDate();
+                return d && d >= startDate && (Number(m.changeQty) || 0) < 0;
+            }).reduce((sum, m) => sum + Math.abs(Number(m.changeQty) || 0), 0);
+
+            let allOutAfterStart = 0;
+            invoices.filter(inv => {
+                const d = inv.createdAt?.toDate();
+                return d && d >= startDate;
+            }).forEach(inv => {
+                (inv.itemsSummary || []).forEach(item => {
+                    if (item.productId === p.id || (!item.productId && item.productName === p.name)) {
+                        allOutAfterStart += Number(item.quantity) || 0;
                     }
                 });
             });
 
             const currentBalance = Number(p.stockQty) || 0;
-            const openingStock = currentBalance - ((totalImports + totalLocal + totalMovesIn) - (totalOut + totalMovesOut));
+            const netChangeAfterStart = (allImportsAfterStart + allLocalAfterStart + allMovementsInAfterStart) - (allOutAfterStart + allMovementsOutAfterStart);
+            const openingStock = currentBalance - netChangeAfterStart;
 
             // Per Location Breakdown
             const locDetails = {};
             locationNames.forEach(locName => {
-                const locInImports = prodImports.filter(i => i.location === locName).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-                const locInLocal = prodLocal.filter(l => l.location === locName).reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
-                const locMovesIn = prodMovements.filter(m => m.location === locName && (Number(m.changeQty) || 0) > 0).reduce((sum, m) => sum + (Number(m.changeQty) || 0), 0);
-                const locMovesOut = prodMovements.filter(m => m.location === locName && (Number(m.changeQty) || 0) < 0).reduce((sum, m) => sum + Math.abs(Number(m.changeQty) || 0), 0);
+                const locInImports = filteredImports.filter(i => i.location === locName).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+                const locInLocal = filteredLocal.filter(l => l.location === locName).reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+                const locMovesIn = filteredMovements.filter(m => m.location === locName && (Number(m.changeQty) || 0) > 0).reduce((sum, m) => sum + (Number(m.changeQty) || 0), 0);
+                const locMovesOut = filteredMovements.filter(m => m.location === locName && (Number(m.changeQty) || 0) < 0).reduce((sum, m) => sum + Math.abs(Number(m.changeQty) || 0), 0);
 
                 let locOut = 0;
-                invoices.filter(inv => inv.fromLocation === locName).forEach(inv => {
+                invoices.filter(inv => {
+                    const d = inv.createdAt?.toDate();
+                    return inv.fromLocation === locName && d && isWithinInterval(d, { start: startDate, end: endDate });
+                }).forEach(inv => {
                     (inv.itemsSummary || []).forEach(item => {
                         if (item.productId === p.id || (!item.productId && item.productName === p.name)) {
                             locOut += Number(item.quantity) || 0;
@@ -128,22 +176,23 @@ export default function StockManagement() {
                 });
 
                 locDetails[locName] = {
-                    in: Number((locInImports + locInLocal + locMovesIn).toFixed(1)),
-                    out: Number((locOut + locMovesOut).toFixed(1)),
-                    balance: Number((p.locations?.[locName] || 0).toFixed(1))
+                    in: Number((locInImports + locInLocal + locMovesIn).toFixed(2)),
+                    out: Number((locOut + locMovesOut).toFixed(2)),
+                    balance: Number((p.locations?.[locName] || 0).toFixed(2))
                 };
             });
 
             return {
                 id: p.id,
                 name: p.name,
-                openingStock: Number(openingStock.toFixed(1)),
-                totalIn: Number((totalImports + totalLocal + totalMovesIn).toFixed(1)),
-                totalOut: Number((totalOut + totalMovesOut).toFixed(1)),
-                balance: Number(currentBalance.toFixed(1)),
+                openingStock: Number(openingStock.toFixed(2)),
+                totalIn: Number((totalImportsInRange + totalLocalInRange + totalMovesInInRange).toFixed(2)),
+                totalOut: Number((totalOutInRange + totalMovesOutInRange).toFixed(2)),
+                balance: Number((openingStock + (totalImportsInRange + totalLocalInRange + totalMovesInInRange) - (totalOutInRange + totalMovesOutInRange)).toFixed(2)),
+                currentBalance: Number(currentBalance.toFixed(2)),
                 lowStock: currentBalance < (p.lowStockThreshold || 10),
                 locationDetails: locDetails,
-                recentTransactions: [...prodImports, ...prodLocal, ...prodMovements]
+                recentTransactions: [...filteredImports, ...filteredLocal, ...filteredMovements]
                     .sort((a, b) => {
                         const dateA = a.date || a.createdAt?.toDate()?.toISOString() || '';
                         const dateB = b.date || b.createdAt?.toDate()?.toISOString() || '';
@@ -152,7 +201,7 @@ export default function StockManagement() {
                     .slice(0, 5)
             };
         }).sort((a, b) => a.name.localeCompare(b.name));
-    }, [products, imports, localPurchases, invoices, movements, settings]);
+    }, [products, imports, localPurchases, invoices, movements, settings, dateFilter]);
 
     const stats = useMemo(() => {
         const totalUnits = products.reduce((sum, p) => sum + (Number(p.stockQty) || 0), 0);
@@ -226,6 +275,33 @@ export default function StockManagement() {
                 </div>
             </div>
 
+            {activeTab === 'dashboard' && (
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-50 rounded-xl"><Calendar className="h-5 w-5 text-blue-600" /></div>
+                        <div>
+                            <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs">Filter by Date Range</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">Opening stock & transactions will update</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 w-full md:w-auto">
+                        <input
+                            type="date"
+                            value={dateFilter.start}
+                            onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                            className="text-xs border-none focus:ring-0 bg-transparent p-1 font-bold flex-1 md:flex-none"
+                        />
+                        <span className="text-slate-400 text-xs px-1 font-black">TO</span>
+                        <input
+                            type="date"
+                            value={dateFilter.end}
+                            onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                            className="text-xs border-none focus:ring-0 bg-transparent p-1 font-bold flex-1 md:flex-none"
+                        />
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-5">
                     <div className="bg-blue-50 p-4 rounded-2xl">
@@ -233,7 +309,7 @@ export default function StockManagement() {
                     </div>
                     <div>
                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Units In-Hand</p>
-                        <p className="text-3xl font-black text-slate-900">{stats.totalUnits.toFixed(1)} <span className="text-sm font-bold text-slate-400 tracking-normal ml-1">MTS</span></p>
+                        <p className="text-3xl font-black text-slate-900">{stats.totalUnits.toFixed(2)} <span className="text-sm font-bold text-slate-400 tracking-normal ml-1">MTS</span></p>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-5">
@@ -242,19 +318,19 @@ export default function StockManagement() {
                     </div>
                     <div>
                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Stock Value</p>
-                        <p className="text-3xl font-black text-emerald-600">₹{stats.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                        <p className="text-3xl font-black text-emerald-600">₹{stats.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                 </div>
             </div>
 
-            {activeTab === 'dashboard' && <StockDashboard summary={stockSummary} imports={imports} localPurchases={localPurchases} products={products} />}
+            {activeTab === 'dashboard' && <StockDashboard summary={stockSummary} imports={imports} localPurchases={localPurchases} products={products} dateFilter={dateFilter} />}
             {activeTab === 'import' && <ImportForm products={products} suppliers={suppliers} transporters={transporters} settings={settings} locations={availableLocations} onSuccess={() => setActiveTab('dashboard')} />}
             {activeTab === 'local' && <LocalPurchaseForm products={products} suppliers={suppliers} transporters={transporters} settings={settings} locations={availableLocations} onSuccess={() => setActiveTab('dashboard')} />}
         </div>
     );
 }
 
-function StockDashboard({ summary, imports, localPurchases, products }) {
+function StockDashboard({ summary, imports, localPurchases, products, dateFilter }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedRows, setExpandedRows] = useState(new Set());
 
@@ -310,12 +386,12 @@ function StockDashboard({ summary, imports, localPurchases, products }) {
                                             {item.lowStock && <span className="text-[10px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full font-black uppercase">Low</span>}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-center font-medium text-slate-400">{item.openingStock.toFixed(1)}</td>
-                                    <td className="px-6 py-4 text-center font-bold text-emerald-600">+{item.totalIn.toFixed(1)}</td>
-                                    <td className="px-6 py-4 text-center font-bold text-rose-400">-{item.totalOut.toFixed(1)}</td>
+                                    <td className="px-6 py-4 text-center font-medium text-slate-400">{item.openingStock.toFixed(2)}</td>
+                                    <td className="px-6 py-4 text-center font-bold text-emerald-600">+{item.totalIn.toFixed(2)}</td>
+                                    <td className="px-6 py-4 text-center font-bold text-rose-400">-{item.totalOut.toFixed(2)}</td>
                                     <td className="px-6 py-4 text-right">
                                         <span className={`text-base font-black ${item.lowStock ? 'text-rose-600' : 'text-slate-900'}`}>
-                                            {item.balance.toFixed(1)}
+                                            {item.balance.toFixed(2)}
                                         </span>
                                     </td>
                                 </tr>
@@ -410,8 +486,13 @@ function StockDashboard({ summary, imports, localPurchases, products }) {
                 </div>
                 <div className="space-y-3">
                     {[...imports, ...localPurchases]
-                        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-                        .slice(0, 10)
+                        .filter(item => {
+                            const d = new Date(item.date);
+                            const start = startOfDay(new Date(dateFilter.start));
+                            const end = endOfDay(new Date(dateFilter.end));
+                            return isWithinInterval(d, { start, end });
+                        })
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
                         .map(item => {
                             const isImport = item.beNumber !== undefined;
                             const productName = products.find(p => p.id === item.productId)?.name || 'Unknown';
@@ -441,7 +522,7 @@ function StockDashboard({ summary, imports, localPurchases, products }) {
                                     <div className="flex flex-wrap items-center gap-6 md:gap-12">
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Quantity</p>
-                                            <p className="text-lg font-black text-slate-900">{(Number(item.quantity) || 0).toFixed(1)} <span className="text-[10px] text-slate-400">MT</span></p>
+                                            <p className="text-lg font-black text-slate-900">{(Number(item.quantity) || 0).toFixed(2)} <span className="text-[10px] text-slate-400">MT</span></p>
                                         </div>
 
                                         {item.vehicleNumber && (
@@ -722,7 +803,7 @@ function ImportForm({ products, suppliers, transporters, settings, locations, on
                                             readOnly
                                             tabIndex="-1"
                                             className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-blue-600 dark:text-blue-400 cursor-not-allowed outline-none"
-                                            value={`₹${totals.balanceFreight.toLocaleString('en-IN')}`}
+                                            value={`₹${totals.balanceFreight.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                         />
                                     </div>
                                     <div>
@@ -826,7 +907,7 @@ function ImportForm({ products, suppliers, transporters, settings, locations, on
                             readOnly
                             tabIndex="-1"
                             className="bg-transparent border-none text-2xl font-black text-slate-900 dark:text-white outline-none cursor-not-allowed"
-                            value={`${formData.currency} ${totals.totalPrice.toLocaleString('en-IN')}`}
+                            value={`${formData.currency} ${totals.totalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         />
                     </div>
                     <button type="submit" disabled={isSaving} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs disabled:opacity-50">
@@ -1069,7 +1150,7 @@ function LocalPurchaseForm({ products, suppliers, transporters, settings, locati
                                             readOnly
                                             tabIndex="-1"
                                             className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-blue-600 dark:text-blue-400 cursor-not-allowed outline-none"
-                                            value={`₹${totals.balanceFreight.toLocaleString('en-IN')}`}
+                                            value={`₹${totals.balanceFreight.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                         />
                                     </div>
                                     <div>
@@ -1174,7 +1255,7 @@ function LocalPurchaseForm({ products, suppliers, transporters, settings, locati
                                 readOnly
                                 tabIndex="-1"
                                 className="bg-transparent border-none text-2xl font-black text-slate-900 dark:text-white outline-none cursor-not-allowed"
-                                value={`INR ${totals.totalPrice.toLocaleString('en-IN')}`}
+                                value={`INR ${totals.totalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             />
                         </div>
                         <label className="flex items-center gap-3 cursor-pointer select-none border-l border-slate-200 pl-6">

@@ -324,15 +324,15 @@ export default function Expenses() {
                 {/* Main Stats */}
                 <div className="bg-white p-2.5 md:p-3 rounded-xl border border-green-100 shadow-sm flex flex-col items-center justify-center min-h-[60px] md:min-h-[70px]">
                     <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Income</span>
-                    <span className="text-[11px] md:text-xs font-medium text-green-600 truncate w-full text-center">₹{totalIncome.toLocaleString('en-IN')}</span>
+                    <span className="text-[11px] md:text-xs font-medium text-green-600 truncate w-full text-center">₹{totalIncome.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="bg-white p-2.5 md:p-3 rounded-xl border border-orange-100 shadow-sm flex flex-col items-center justify-center min-h-[60px] md:min-h-[70px]">
                     <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Exp.</span>
-                    <span className="text-[11px] md:text-xs font-medium text-orange-600 truncate w-full text-center">₹{totalExpense.toLocaleString('en-IN')}</span>
+                    <span className="text-[11px] md:text-xs font-medium text-orange-600 truncate w-full text-center">₹{totalExpense.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className={`p-2.5 md:p-3 rounded-xl border shadow-sm flex flex-col items-center justify-center min-h-[60px] md:min-h-[70px] ${balance >= 0 ? 'bg-green-50 border-green-200' : 'bg-rose-50 border-rose-200'}`}>
                     <span className="text-[8px] md:text-[9px] font-black text-slate-400 tracking-widest mb-0.5">CASH</span>
-                    <span className={`text-[11px] md:text-lg font-black ${balance >= 0 ? 'text-green-800' : 'text-rose-800'} truncate w-full text-center`}>₹{balance.toLocaleString('en-IN')}</span>
+                    <span className={`text-[11px] md:text-lg font-black ${balance >= 0 ? 'text-green-800' : 'text-rose-800'} truncate w-full text-center`}>₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
 
                 {/* Category Stats - Matching Design */}
@@ -348,7 +348,7 @@ export default function Expenses() {
                             cat === 'Fuel' ? 'text-orange-600' :
                                 cat === 'Overtime' ? 'text-purple-600' :
                                     'text-slate-700'
-                            } truncate w-full text-center`}>₹{categoryTotals[cat].toLocaleString('en-IN')}</span>
+                            } truncate w-full text-center`}>₹{categoryTotals[cat].toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 ))}
             </div>
@@ -477,7 +477,7 @@ export default function Expenses() {
                                                         <div className="flex flex-col gap-0.5">
                                                             <span className="text-[7px] font-bold text-slate-400 uppercase ml-1 text-center">Total</span>
                                                             <input
-                                                                value={`₹${(Number(row.labourQty) * Number(row.labourRate)).toLocaleString('en-IN')}`}
+                                                                value={`₹${(Number(row.labourQty) * Number(row.labourRate)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                                                 readOnly
                                                                 tabIndex="-1"
                                                                 className="w-full bg-slate-100 border border-slate-200 px-1 py-1.5 rounded-lg text-[10px] font-black text-blue-700 text-center cursor-not-allowed focus:ring-0 outline-none"
@@ -509,7 +509,7 @@ export default function Expenses() {
                                                         <div className="flex flex-col gap-0.5">
                                                             <span className="text-[7px] font-bold text-slate-400 uppercase ml-1 text-center">Total</span>
                                                             <input
-                                                                value={`₹${(Number(row.overtimeHeads) * Number(row.overtimeRate)).toLocaleString('en-IN')}`}
+                                                                value={`₹${(Number(row.overtimeHeads) * Number(row.overtimeRate)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                                                 readOnly
                                                                 tabIndex="-1"
                                                                 className="w-full bg-slate-100 border border-slate-200 px-1 py-1.5 rounded-lg text-[10px] font-black text-purple-700 text-center cursor-not-allowed focus:ring-0 outline-none"
@@ -625,7 +625,7 @@ export default function Expenses() {
                                             {exp.description || 'No description'}
                                         </td>
                                         <td className="px-6 py-4 text-right font-black text-rose-600">
-                                            ₹{exp.amount.toLocaleString('en-IN')}
+                                            ₹{exp.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {userRole !== 'viewer' && (
@@ -715,7 +715,7 @@ export default function Expenses() {
                                     <p className="text-[10px] text-slate-500">{format(new Date(inc.date), 'dd MMM yyyy')}</p>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <span className="font-black text-green-600">₹{inc.amount.toLocaleString('en-IN')}</span>
+                                    <span className="font-black text-green-600">₹{inc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     {userRole !== 'viewer' && (
                                         <button onClick={() => handleIncomeDelete(inc.id)} className="text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
                                     )}

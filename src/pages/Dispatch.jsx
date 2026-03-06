@@ -67,7 +67,7 @@ export default function Dispatch() {
             'Customer': disp.customerName || '-',
             'Product': disp.productName,
             'Origin': disp.location,
-            'Quantity (mts)': (Number(disp.quantity) || 0).toFixed(1),
+            'Quantity (mts)': (Number(disp.quantity) || 0).toFixed(2),
             'Vehicle Number': disp.vehicleNumber || disp.transport?.vehicleNumber || '-',
             'Transport Mode': disp.transport?.mode || '-',
             'LR Number': disp.transport?.lrNumber || '-',
@@ -226,7 +226,7 @@ export default function Dispatch() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="font-black text-slate-900">{(Number(disp.quantity) || 0).toFixed(1)}</div>
+                                            <div className="font-black text-slate-900">{(Number(disp.quantity) || 0).toFixed(2)}</div>
                                             <div className="text-[9px] text-slate-400 font-bold uppercase">MTS</div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -275,7 +275,7 @@ export default function Dispatch() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-sm font-black text-indigo-600">{(Number(disp.quantity) || 0).toFixed(1)} mts</div>
+                                        <div className="text-sm font-black text-indigo-600">{(Number(disp.quantity) || 0).toFixed(2)} mts</div>
                                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{disp.productName}</div>
                                     </div>
                                 </div>

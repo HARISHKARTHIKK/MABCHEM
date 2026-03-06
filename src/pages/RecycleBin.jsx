@@ -49,11 +49,11 @@ export default function RecycleBin() {
                             const pData = productSnap.data();
                             const locations = { ...pData.locations };
                             const fromLoc = invoiceData.fromLocation;
-                            locations[fromLoc] = Number(((Number(locations[fromLoc]) || 0) - Number(line.quantity)).toFixed(1));
+                            locations[fromLoc] = Number(((Number(locations[fromLoc]) || 0) - Number(line.quantity)).toFixed(2));
                             const newTotal = Object.values(locations).reduce((a, b) => a + (Number(b) || 0), 0);
                             transaction.update(productRef, {
                                 locations,
-                                stockQty: Number(newTotal.toFixed(1)),
+                                stockQty: Number(newTotal.toFixed(2)),
                                 updatedAt: serverTimestamp()
                             });
                         }
@@ -207,7 +207,7 @@ export default function RecycleBin() {
                                             {item.type === 'INVOICE' && (
                                                 <div className="space-y-1">
                                                     <div className="font-bold text-slate-800 dark:text-slate-100">#{item.data.invoiceNo} - {item.data.customerName}</div>
-                                                    <div className="text-xs text-slate-500">Amount: ₹{item.data.totalAmount?.toLocaleString('en-IN')} | Items: {item.data.items?.length || 0}</div>
+                                                    <div className="text-xs text-slate-500">Amount: ₹{item.data.totalAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Items: {item.data.items?.length || 0}</div>
                                                 </div>
                                             )}
                                         </div>

@@ -304,7 +304,7 @@ export default function Invoices() {
                                         {groupedByLocation[location].length} Invoices
                                     </div>
                                     <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2">
-                                        Total: ₹{(groupedByLocation[location].reduce((acc, inv) => acc + (Number(inv.totalAmount) || 0), 0)).toLocaleString('en-IN')}
+                                        Total: ₹{(groupedByLocation[location].reduce((acc, inv) => acc + (Number(inv.totalAmount) || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                 </div>
                             </div>
@@ -364,8 +364,8 @@ export default function Invoices() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <div className="text-slate-900 font-black">₹ {(Number(inv.totalAmount) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
-                                                        <div className="text-[10px] text-slate-400 font-bold">Base: ₹{(Number(inv.subtotal) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                                                        <div className="text-slate-900 font-black">₹ {(Number(inv.totalAmount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                                        <div className="text-[10px] text-slate-400 font-bold">Base: ₹{(Number(inv.subtotal) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col items-center gap-1">
@@ -506,8 +506,8 @@ export default function Invoices() {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="text-sm font-black text-blue-600">₹{(Number(inv.totalAmount) || 0).toFixed(0)}</div>
-                                                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Basic: ₹{(Number(inv.subtotal) || 0).toFixed(0)}</div>
+                                                    <div className="text-sm font-black text-blue-600">₹{(Number(inv.totalAmount) || 0).toFixed(2)}</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Basic: ₹{(Number(inv.subtotal) || 0).toFixed(2)}</div>
                                                 </div>
                                             </div>
 
@@ -844,7 +844,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                 }
 
                 if (globalStock < qtyVal) {
-                    alert(`Insufficient global stock for ${line.name}. Available: ${globalStock.toFixed(1)}, Requested: ${qtyVal.toFixed(1)}`);
+                    alert(`Insufficient global stock for ${line.name}. Available: ${globalStock.toFixed(2)}, Requested: ${qtyVal.toFixed(2)}`);
                     return;
                 }
             }
@@ -1204,7 +1204,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                                             const totalStock = Object.values(p.locations || {}).reduce((a, b) => a + (Number(b) || 0), 0);
                                                             return (
                                                                 <option key={p.id} value={String(p.id)}>
-                                                                    {p.name} ({totalStock.toFixed(1)} mts)
+                                                                    {p.name} ({totalStock.toFixed(2)} mts)
                                                                 </option>
                                                             );
                                                         })}
@@ -1318,7 +1318,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                                         const totalStock = Object.values(p.locations || {}).reduce((a, b) => a + (Number(b) || 0), 0);
                                                         return (
                                                             <option key={p.id} value={String(p.id)}>
-                                                                {p.name} ({totalStock.toFixed(1)} mts)
+                                                                {p.name} ({totalStock.toFixed(2)} mts)
                                                             </option>
                                                         );
                                                     })}
@@ -1400,7 +1400,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                             </div>
                                             <div className="text-right space-y-0.5">
                                                 <p className="text-[10px] font-black text-slate-400 uppercase">Subtotal</p>
-                                                <p className="text-sm font-black text-slate-900 dark:text-white">₹ {(Number(String(line.qty || 0).replace(/[^0-9.]/g, '')) * Number(String(line.price || 0).replace(/[^0-9.]/g, ''))).toLocaleString('en-IN')}</p>
+                                                <p className="text-sm font-black text-slate-900 dark:text-white">₹ {(Number(String(line.qty || 0).replace(/[^0-9.]/g, '')) * Number(String(line.price || 0).replace(/[^0-9.]/g, ''))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1553,7 +1553,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                     readOnly
                                     tabIndex="-1"
                                     className="w-28 bg-slate-50 dark:bg-slate-800 border-none text-right text-base font-bold text-slate-800 dark:text-slate-200 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
-                                    value={`₹ ${linesTotal.toFixed(1)}`}
+                                    value={`₹ ${linesTotal.toFixed(2)}`}
                                 />
                             </div>
                             {transport.isExtra && (
@@ -1563,7 +1563,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                         readOnly
                                         tabIndex="-1"
                                         className="w-28 bg-blue-50 dark:bg-blue-900/30 border-none text-right text-base font-bold text-blue-600 dark:text-blue-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
-                                        value={`+ ₹ ${Number(transport.amount).toFixed(1)}`}
+                                        value={`+ ₹ ${Number(transport.amount).toFixed(2)}`}
                                     />
                                 </div>
                             )}
@@ -1575,7 +1575,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                             readOnly
                                             tabIndex="-1"
                                             className="w-28 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-base font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
-                                            value={`+ ₹ ${cgst.toFixed(1)}`}
+                                            value={`+ ₹ ${cgst.toFixed(2)}`}
                                         />
                                     </div>
                                     <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -1584,7 +1584,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                             readOnly
                                             tabIndex="-1"
                                             className="w-28 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-base font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
-                                            value={`+ ₹ ${sgst.toFixed(1)}`}
+                                            value={`+ ₹ ${sgst.toFixed(2)}`}
                                         />
                                     </div>
                                 </>
@@ -1595,7 +1595,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                         readOnly
                                         tabIndex="-1"
                                         className="w-28 bg-amber-50 dark:bg-amber-900/30 border-none text-right text-base font-bold text-amber-600 dark:text-amber-400 tracking-tighter cursor-not-allowed outline-none rounded-lg px-2 py-0.5"
-                                        value={`+ ₹ ${igst.toFixed(1)}`}
+                                        value={`+ ₹ ${igst.toFixed(2)}`}
                                     />
                                 </div>
                             )}
@@ -1604,7 +1604,7 @@ function CreateInvoice({ onCancel, onSuccess, invoice }) {
                                 <div className="text-3xl font-black text-center text-slate-900 dark:text-white tracking-tighter whitespace-nowrap bg-slate-50 dark:bg-slate-800 py-3 rounded-2xl border border-slate-100 dark:border-slate-700 cursor-not-allowed">
                                     <span className="text-blue-600 dark:text-blue-400 text-xl mr-1">₹</span>
                                     {total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                    <span className="text-slate-300 dark:text-slate-500 text-lg font-light">.{total.toFixed(1).split('.')[1]}</span>
+                                    <span className="text-slate-300 dark:text-slate-500 text-lg font-light">.{total.toFixed(2).split('.')[1]}</span>
                                 </div>
                             </div>
                             <button
@@ -1717,39 +1717,39 @@ function InvoiceViewModal({ invoice, onClose }) {
                         <div className="w-64 space-y-2 text-sm text-right">
                             <div className="flex justify-between text-slate-600">
                                 <span>Basic Amount</span>
-                                <span>₹ {Number(invoice.subtotal).toFixed(1)}</span>
+                                <span>₹ {Number(invoice.subtotal).toFixed(2)}</span>
                             </div>
                             {invoice.transport?.isExtra && (
                                 <div className="flex justify-between text-slate-600">
                                     <span>Transport</span>
-                                    <span>₹ {Number(invoice.transport.amount).toFixed(1)}</span>
+                                    <span>₹ {Number(invoice.transport.amount).toFixed(2)}</span>
                                 </div>
                             )}
                             {invoice.taxType === 'CGST_SGST' ? (
                                 <>
                                     <div className="flex justify-between text-slate-600">
                                         <span>CGST (9%)</span>
-                                        <span>₹ {Number(invoice.cgst || 0).toFixed(1)}</span>
+                                        <span>₹ {Number(invoice.cgst || 0).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between text-slate-600">
                                         <span>SGST (9%)</span>
-                                        <span>₹ {Number(invoice.sgst || 0).toFixed(1)}</span>
+                                        <span>₹ {Number(invoice.sgst || 0).toFixed(2)}</span>
                                     </div>
                                 </>
                             ) : invoice.taxType === 'IGST' ? (
                                 <div className="flex justify-between text-slate-600">
                                     <span>IGST (18%)</span>
-                                    <span>₹ {Number(invoice.igst || 0).toFixed(1)}</span>
+                                    <span>₹ {Number(invoice.igst || 0).toFixed(2)}</span>
                                 </div>
                             ) : (
                                 <div className="flex justify-between text-slate-600">
                                     <span>GST (18%)</span>
-                                    <span>₹ {Number(invoice.taxAmount || 0).toFixed(1)}</span>
+                                    <span>₹ {Number(invoice.taxAmount || 0).toFixed(2)}</span>
                                 </div>
                             )}
                             <div className="pt-3 border-t border-slate-200 flex justify-between font-bold text-xl text-slate-900">
                                 <span>Total</span>
-                                <span>₹ {Number(invoice.totalAmount).toFixed(1)}</span>
+                                <span>₹ {Number(invoice.totalAmount).toFixed(2)}</span>
                             </div>
                         </div>
                     </div>
@@ -1866,7 +1866,7 @@ function InvoiceItemsLoader({ invoiceId }) {
                     <td className="py-3 font-medium text-slate-800">
                         {item.productName || item.name || item.productId || 'Unknown Item'}
                     </td>
-                    <td className="py-3 text-right">{Number(item.quantity).toFixed(3)}</td>
+                    <td className="py-3 text-right">{Number(item.quantity).toFixed(2)}</td>
                     <td className="py-3 text-right">₹ {Number(item.price).toFixed(2)}</td>
                     <td className="py-3 text-right">₹ {(Number(item.quantity) * Number(item.price)).toFixed(2)}</td>
                 </tr>

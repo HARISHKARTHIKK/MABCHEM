@@ -365,21 +365,21 @@ export default function TransporterReports() {
                         <div className="p-2 bg-indigo-50 rounded-lg"><TrendingUp className="h-5 w-5 text-indigo-600" /></div>
                         <h3 className="font-semibold text-slate-700 text-sm">Trans. Payable</h3>
                     </div>
-                    <p className="text-2xl md:text-3xl font-bold text-indigo-600">₹{netBalanceDue.toLocaleString('en-IN')}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-indigo-600">₹{netBalanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                     <div className="flex items-center gap-3 mb-2 md:mb-4">
                         <div className="p-2 bg-orange-50 rounded-lg"><Truck className="h-5 w-5 text-orange-600" /></div>
                         <h3 className="font-semibold text-slate-700 text-sm">Trans. To Pay</h3>
                     </div>
-                    <p className="text-2xl md:text-3xl font-bold text-orange-600">₹{totalToPayDocs.toLocaleString('en-IN')}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-orange-600">₹{totalToPayDocs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                     <div className="flex items-center gap-3 mb-2 md:mb-4">
                         <div className="p-2 bg-emerald-50 rounded-lg"><FileText className="h-5 w-5 text-emerald-600" /></div>
                         <h3 className="font-semibold text-slate-700 text-sm">Total Doc Value</h3>
                     </div>
-                    <p className="text-2xl md:text-3xl font-bold text-emerald-600">₹{totalDocVal.toLocaleString('en-IN')}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-emerald-600">₹{totalDocVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
             </div>
 
@@ -408,9 +408,9 @@ export default function TransporterReports() {
                                         <div className="text-[10px] font-mono text-slate-400 font-bold">{data.gstin || 'NO GSTIN'}</div>
                                     </td>
                                     <td className="px-6 py-4">{data.count}</td>
-                                    <td className="px-6 py-4 text-emerald-600 font-bold">₹{data.totalDocValue.toLocaleString('en-IN')}</td>
-                                    <td className="px-6 py-4 text-indigo-600 font-medium">₹{data.balanceDue.toLocaleString('en-IN')}</td>
-                                    <td className="px-6 py-4 text-orange-600 font-medium">₹{data.sumToPayDocs.toLocaleString('en-IN')}</td>
+                                    <td className="px-6 py-4 text-emerald-600 font-bold">₹{data.totalDocValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td className="px-6 py-4 text-indigo-600 font-medium">₹{data.balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td className="px-6 py-4 text-orange-600 font-medium">₹{data.sumToPayDocs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
@@ -472,8 +472,8 @@ export default function TransporterReports() {
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-900">{rec.transporterName || '-'}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-right font-bold text-slate-900">₹{rec.docValue.toLocaleString('en-IN')}</td>
-                                    <td className="px-6 py-4 text-right font-medium text-indigo-600">{rec.transportationCost ? `₹${rec.transportationCost.toLocaleString('en-IN')}` : '-'}</td>
+                                    <td className="px-6 py-4 text-right font-bold text-slate-900">₹{rec.docValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td className="px-6 py-4 text-right font-medium text-indigo-600">{rec.transportationCost ? `₹${rec.transportationCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${(rec.type === 'Dispatch' && rec.transportPaymentType === 'To Pay') ||
                                             (rec.type !== 'Dispatch' && rec.transportPaymentType === 'Payable')
@@ -630,7 +630,7 @@ export default function TransporterReports() {
                                                     <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{p.paymentMode}</span>
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-500 text-xs">{p.reference || '-'}</td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-900">₹{Number(p.amount).toLocaleString('en-IN')}</td>
+                                                <td className="px-4 py-3 text-right font-bold text-slate-900">₹{Number(p.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                 <td className="px-4 py-3 text-center">
                                                     <button
                                                         onClick={() => handleDeletePayment(p.id)}
@@ -649,7 +649,7 @@ export default function TransporterReports() {
                         <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
                             <div className="text-xs text-slate-400 uppercase tracking-widest font-black">Total Manual Payments</div>
                             <div className="text-lg font-bold text-indigo-600">
-                                ₹{payments.filter(p => p.transporterId === selectedTransporter?.id).reduce((sum, p) => sum + Number(p.amount), 0).toLocaleString('en-IN')}
+                                ₹{payments.filter(p => p.transporterId === selectedTransporter?.id).reduce((sum, p) => sum + Number(p.amount), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
                     </div>
